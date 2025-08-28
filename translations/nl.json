@@ -88,17 +88,17 @@
           "max_fertilizer_consumption": "Max. Mestverbruik",
           "min_ph": "Min. pH Waarde",
           "max_ph": "Max. pH Waarde",
-          "seed_start": "Zaad Start",
+          "seeds_start": "Zaad Start",
           "germination_start": "Kieming Start",
           "rooting_start": "Worteling Start",
-          "growth_start": "Groei Start",
+          "growing_start": "Groei Start",
           "flowering_start": "Bloei Start",
           "harvested_start": "Geoogst Start",
           "removed_start": "Verwijderd Start",
-          "seed_duration": "Zaad Duur",
+          "seeds_duration": "Zaad Duur",
           "germination_duration": "Kieming Duur",
           "rooting_duration": "Worteling Duur",
-          "growth_duration": "Groeiduur",
+          "growing_duration": "Groeiduur",
           "flower_duration": "Bloeiduur",
           "harvested_duration": "Geoogst Duur",
           "removed_duration": "Verwijderd Duur"
@@ -121,10 +121,10 @@
           "energy_cost": "Energiekosten"
         },
         "growth_phases": {
-          "seed": "Zaad",
+          "seeds": "Zaad",
           "germination": "Kieming",
           "rooting": "Worteling",
-          "growth": "Groei",
+          "growing": "Groei",
           "flowering": "Bloei",
           "harvested": "Geoogst",
           "removed": "Verwijderd"
@@ -217,4 +217,4 @@
       }
     }
   }
-} 
+}

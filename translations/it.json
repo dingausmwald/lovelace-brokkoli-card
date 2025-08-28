@@ -88,17 +88,17 @@
           "max_fertilizer_consumption": "Consumo Max. Fertilizzante",
           "min_ph": "Valore pH Min.",
           "max_ph": "Valore pH Max.",
-          "seed_start": "Inizio Seme",
+          "seeds_start": "Inizio Seme",
           "germination_start": "Inizio Germinazione",
           "rooting_start": "Inizio Radicazione",
-          "growth_start": "Inizio Crescita",
+          "growing_start": "Inizio Crescita",
           "flowering_start": "Inizio Fioritura",
           "harvested_start": "Inizio Raccolta",
           "removed_start": "Inizio Rimozione",
-          "seed_duration": "Durata Seme",
+          "seeds_duration": "Durata Seme",
           "germination_duration": "Durata Germinazione",
           "rooting_duration": "Durata Radicazione",
-          "growth_duration": "Durata di Crescita",
+          "growing_duration": "Durata di Crescita",
           "flower_duration": "Durata di Fioritura",
           "flowering_duration": "Durata di Fioritura",
           "harvested_duration": "Durata Raccolta",
@@ -122,10 +122,10 @@
           "energy_cost": "Costo Energetico"
         },
         "growth_phases": {
-          "seed": "Seme",
+          "seeds": "Seme",
           "germination": "Germinazione",
           "rooting": "Radicazione",
-          "growth": "Crescita",
+          "growing": "Crescita",
           "flowering": "Fioritura",
           "harvested": "Raccolta",
           "removed": "Rimossa"
@@ -218,4 +218,4 @@
       }
     }
   }
-} 
+}
