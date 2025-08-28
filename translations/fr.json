@@ -88,14 +88,14 @@
           "max_fertilizer_consumption": "Consommation Max. d'Engrais",
           "min_ph": "Valeur pH Min.",
           "max_ph": "Valeur pH Max.",
-          "seed_start": "Début de Graine",
+          "seeds_start": "Début de Graine",
           "germination_start": "Début de Germination",
           "rooting_start": "Début d'Enracinement",
           "growth_start": "Début de Croissance",
           "flowering_start": "Début de Floraison",
           "harvested_start": "Début de Récolte",
           "removed_start": "Début de Suppression",
-          "seed_duration": "Durée de Graine",
+          "seeds_duration": "Durée de Graine",
           "germination_duration": "Durée de Germination",
           "rooting_duration": "Durée d'Enracinement",
           "growth_duration": "Durée de Croissance",
@@ -218,4 +218,4 @@
       }
     }
   }
-} 
+}

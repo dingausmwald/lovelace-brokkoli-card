@@ -5,7 +5,8 @@ export const CARD_NAME = "brokkoli-card";
 export const CARD_EDITOR_NAME = "brokkoli-card-editor";
 
 // Central phase constants - should match field-definitions.ts
-export const PHASES = ['seed', 'germination', 'rooting', 'growth', 'flowering', 'removed', 'harvested'] as const;
+// export const PHASES = ['seed', 'germination', 'rooting', 'growth', 'flowering', 'removed', 'harvested'] as const;
+export const PHASES = ['seeds', 'germination', 'rooting', 'growth', 'flowering', 'removed', 'harvested'] as const;
 
 export const default_show_bars = [
     "moisture",
@@ -66,7 +67,7 @@ export const plantAttributes : DropdownOption[] = [
 // Growth phase icons by index (language-independent)
 const GROWTH_PHASE_ICONS = [
     'mdi:seed',           // Index 0: Seed/Samen
-    'mdi:seed-outline',   // Index 1: Germination/Keimen  
+    'mdi:seed-outline',   // Index 1: Germination/Keimen
     'mdi:sprout',         // Index 2: Rooting/Wurzeln
     'mdi:leaf',           // Index 3: Growth/Wachstum
     'mdi:flower',         // Index 4: Flowering/Blüte
@@ -109,21 +110,21 @@ export const getTreatmentIcon = (treatment: string, hass?: HomeAssistant, plantE
     if (hass && plantEntity?.attributes?._sensorMap && typeof plantEntity.attributes._sensorMap === 'object') {
         const sensorMap = plantEntity.attributes._sensorMap as Record<string, unknown>;
         const treatmentEntityId = sensorMap.treatment as string;
-        
+
         if (treatmentEntityId) {
             const treatmentEntity = hass.states[treatmentEntityId];
-            
+
             if (treatmentEntity?.attributes?.options && Array.isArray(treatmentEntity.attributes.options)) {
                 const options = treatmentEntity.attributes.options;
                 const currentIndex = options.findIndex((option: string) => option === treatment);
-                
+
                 if (currentIndex !== -1) {
                     return getTreatmentIconByIndex(currentIndex);
                 }
             }
         }
     }
-    
+
     // Fallback to string-based matching for backwards compatibility
     switch(treatment.toLowerCase()) {
         case '':
@@ -157,24 +158,24 @@ export const getGrowthPhaseIcon = (phase: string, hass?: HomeAssistant, plantEnt
     if (hass && plantEntity?.attributes?._sensorMap && typeof plantEntity.attributes._sensorMap === 'object') {
         const sensorMap = plantEntity.attributes._sensorMap as Record<string, unknown>;
         const growthPhaseEntityId = sensorMap.growth_phase as string;
-        
+
         if (growthPhaseEntityId) {
             const growthPhaseEntity = hass.states[growthPhaseEntityId];
-            
+
             if (growthPhaseEntity?.attributes?.options && Array.isArray(growthPhaseEntity.attributes.options)) {
                 const options = growthPhaseEntity.attributes.options;
                 const currentIndex = options.findIndex((option: string) => option === phase);
-                
+
                 if (currentIndex !== -1) {
                     return getGrowthPhaseIconByIndex(currentIndex);
                 }
             }
         }
     }
-    
+
     // Fallback to string-based matching for backwards compatibility
     switch(phase.toLowerCase()) {
-        case 'seed':
+        case 'seeds':
         case 'samen':
             return 'mdi:seed';
         case 'germination':

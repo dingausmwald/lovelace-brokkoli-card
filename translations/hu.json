@@ -88,14 +88,14 @@
           "max_fertilizer_consumption": "Max. Műtrágya Fogyasztás",
           "min_ph": "Min. pH Érték",
           "max_ph": "Max. pH Érték",
-          "seed_start": "Mag Kezdet",
+          "seeds_start": "Mag Kezdet",
           "germination_start": "Csírázás Kezdet",
           "rooting_start": "Gyökeresedés Kezdet",
           "growth_start": "Növekedés Kezdet",
           "flowering_start": "Virágzás Kezdet",
           "harvested_start": "Betakarítás Kezdet",
           "removed_start": "Eltávolítás Kezdet",
-          "seed_duration": "Mag Időtartam",
+          "seeds_duration": "Mag Időtartam",
           "germination_duration": "Csírázás Időtartam",
           "rooting_duration": "Gyökeresedés Időtartam",
           "growth_duration": "Növekedési időtartam",
@@ -218,4 +218,4 @@
       }
     }
   }
-} 
+}

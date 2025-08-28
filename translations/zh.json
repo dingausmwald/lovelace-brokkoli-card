@@ -88,14 +88,14 @@
           "max_fertilizer_consumption": "最大肥料消耗",
           "min_ph": "最小pH值",
           "max_ph": "最大pH值",
-          "seed_start": "种子开始",
+          "seeds_start": "种子开始",
           "germination_start": "发芽开始",
           "rooting_start": "生根开始",
           "growth_start": "生长开始",
           "flowering_start": "开花开始",
           "harvested_start": "收获开始",
           "removed_start": "移除开始",
-          "seed_duration": "种子持续时间",
+          "seeds_duration": "种子持续时间",
           "germination_duration": "发芽持续时间",
           "rooting_duration": "生根持续时间",
           "growth_duration": "生长持续时间",
@@ -218,4 +218,4 @@
       }
     }
   }
-} 
+}

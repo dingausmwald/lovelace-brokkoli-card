@@ -124,7 +124,7 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
             if (plant.attributes._sensorMap && plant.attributes._sensorMap['location']) {
                 const locationEntityId = plant.attributes._sensorMap['location'];
                 const locationState = hass?.states[locationEntityId]?.state;
-                
+
                 if (locationState) {
                     try {
                         // Try to parse the state as JSON
@@ -246,8 +246,8 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
 
     // Phase Duration group
     {
-        id: 'seed_duration',
-        name: (hass: HomeAssistant) => TranslationUtils.translateField(hass, 'seed_duration'),
+        id: 'seeds_duration',
+        name: (hass: HomeAssistant) => TranslationUtils.translateField(hass, 'seeds_duration'),
         group: 'phaseduration',
         type: 'number' as FieldType,
         clickAction: 'edit' as ClickAction,
@@ -702,28 +702,28 @@ export const isSensorField = (id: string): boolean => {
 export const getFieldValue = (id: string, hass: HomeAssistant, plant: HomeAssistantEntity): string | number => {
     const field = getFieldDefinition(id);
     if (!field) return '';
-    
+
     if (field.getValue) {
         return field.getValue(hass, plant);
     }
-    
+
     return plant.attributes[id]?.toString() || '';
 };
 
 export const getFieldOptions = (id: string, hass: HomeAssistant, plant: HomeAssistantEntity): string[] => {
     const field = getFieldDefinition(id);
     if (!field?.options) return [];
-    
+
     return field.options(hass, plant);
 };
 
 export const getFieldName = (id: string, hass: HomeAssistant): string => {
     const field = getFieldDefinition(id);
     if (!field) return id;
-    
+
     if (typeof field.name === 'function') {
         return field.name(hass);
     }
-    
+
     return field.name;
-}; 
+};

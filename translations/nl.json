@@ -88,14 +88,14 @@
           "max_fertilizer_consumption": "Max. Mestverbruik",
           "min_ph": "Min. pH Waarde",
           "max_ph": "Max. pH Waarde",
-          "seed_start": "Zaad Start",
+          "seeds_start": "Zaad Start",
           "germination_start": "Kieming Start",
           "rooting_start": "Worteling Start",
           "growth_start": "Groei Start",
           "flowering_start": "Bloei Start",
           "harvested_start": "Geoogst Start",
           "removed_start": "Verwijderd Start",
-          "seed_duration": "Zaad Duur",
+          "seeds_duration": "Zaad Duur",
           "germination_duration": "Kieming Duur",
           "rooting_duration": "Worteling Duur",
           "growth_duration": "Groeiduur",
@@ -217,4 +217,4 @@
       }
     }
   }
-} 
+}

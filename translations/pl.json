@@ -88,14 +88,14 @@
           "max_fertilizer_consumption": "Max. Zużycie Nawozu",
           "min_ph": "Min. Wartość pH",
           "max_ph": "Max. Wartość pH",
-          "seed_start": "Start Nasiona",
+          "seeds_start": "Start Nasiona",
           "germination_start": "Start Kiełkowania",
           "rooting_start": "Start Ukorzeniania",
           "growth_start": "Start Wzrostu",
           "flowering_start": "Start Kwitnienia",
           "harvested_start": "Start Zbioru",
           "removed_start": "Start Usunięcia",
-          "seed_duration": "Czas Nasiona",
+          "seeds_duration": "Czas Nasiona",
           "germination_duration": "Czas Kiełkowania",
           "rooting_duration": "Czas Ukorzeniania",
           "growth_duration": "Czas Wzrostu",
@@ -218,4 +218,4 @@
       }
     }
   }
-} 
+}

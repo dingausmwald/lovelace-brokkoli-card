@@ -121,14 +121,14 @@
       "max_fertilizer_consumption": "Max. Düngerverbrauch",
       "min_ph": "Min. pH-Wert",
       "max_ph": "Max. pH-Wert",
-      "seed_start": "Samen Start",
+      "seeds_start": "Samen Start",
       "germination_start": "Keimen Start",
       "rooting_start": "Wurzeln Start",
       "growth_start": "Wachstum Start",
       "flowering_start": "Blüte Start",
       "harvested_start": "Geerntet Start",
       "removed_start": "Entfernt Start",
-      "seed_duration": "Samen Dauer",
+      "seeds_duration": "Samen Dauer",
       "germination_duration": "Keimen Dauer",
       "rooting_duration": "Wurzeln Dauer",
       "growth_duration": "Wachstum Dauer",
@@ -249,4 +249,3 @@
     }
   }
 }
-  

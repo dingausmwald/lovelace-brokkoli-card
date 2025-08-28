@@ -88,14 +88,14 @@
           "max_fertilizer_consumption": "Макс. Потребление Удобрений",
           "min_ph": "Мин. Значение pH",
           "max_ph": "Макс. Значение pH",
-          "seed_start": "Начало Семени",
+          "seeds_start": "Начало Семени",
           "germination_start": "Начало Прорастания",
           "rooting_start": "Начало Укоренения",
           "growth_start": "Начало Роста",
           "flowering_start": "Начало Цветения",
           "harvested_start": "Начало Урожая",
           "removed_start": "Начало Удаления",
-          "seed_duration": "Длительность Семени",
+          "seeds_duration": "Длительность Семени",
           "germination_duration": "Длительность Прорастания",
           "rooting_duration": "Длительность Укоренения",
           "growth_duration": "Продолжительность роста",
@@ -218,4 +218,4 @@
       }
     }
   }
-} 
+}

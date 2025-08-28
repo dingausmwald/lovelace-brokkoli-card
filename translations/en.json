@@ -89,14 +89,14 @@
       "max_fertilizer_consumption": "Max. Fertilizer Consumption",
       "min_ph": "Min. pH Value",
       "max_ph": "Max. pH Value",
-      "seed_start": "Seed Start",
+      "seeds_start": "Seed Start",
       "germination_start": "Germination Start",
       "rooting_start": "Rooting Start",
       "growth_start": "Growth Start",
       "flowering_start": "Flowering Start",
       "harvested_start": "Harvested Start",
       "removed_start": "Removed Start",
-      "seed_duration": "Seed Duration",
+      "seeds_duration": "Seed Duration",
       "germination_duration": "Germination Duration",
       "rooting_duration": "Rooting Duration",
       "growth_duration": "Growth Duration",
@@ -216,4 +216,4 @@
       "cycle": "Cycle"
     }
   }
-} 
+}

@@ -68,7 +68,7 @@ export class FlowerHistory extends LitElement {
     @state() private _selectedImageIndex: number | null = null;
     @state() private _expandedJournalIds: Set<string> = new Set();
     @state() private _plantingDate: Date | null = null;
-    
+
     // Neue Zustandsvariablen für das Hinzufügen neuer Einträge
     @state() private _addMenuOpen = false;
     @state() private _selectedAddAction: string | null = null;
@@ -96,18 +96,18 @@ export class FlowerHistory extends LitElement {
 
     private async _updateEvents(): Promise<void> {
         if (!this.entityId || !this.hass) return;
-        
+
         const plantName = this.entityId.split('.')[1];
-        
+
         // Ermittle das Pflanzungsdatum (frühestes Datum einer Wachstumsphase)
         this._plantingDate = await this._getPlantingDate();
-        
+
         this.events = await this._collectEvents(plantName);
     }
 
     private async _getPlantingDate(): Promise<Date | null> {
         if (!this.entityId || !this.hass) return null;
-        
+
         // Verwende PlantEntityUtils, um die Pflanzen-Info zu holen
         let plantInfo: PlantInfo;
         try {
@@ -115,22 +115,22 @@ export class FlowerHistory extends LitElement {
         } catch {
             return null;
         }
-        
+
         // Entity IDs aus der API-Antwort extrahieren
         const helpers = plantInfo?.helpers || {};
         const phaseEntityId = helpers.growth_phase?.entity_id;
-        
+
         // Wenn keine EntityId gefunden wurde, ist keine Phasenentität konfiguriert
         if (!phaseEntityId) return null;
-        
+
         const phaseEntity = this.hass.states[phaseEntityId];
-        
+
         if (!phaseEntity?.attributes) return null;
-        
+
         // Sammle alle Phasen-Daten
         const phases = ['samen', 'keimen', 'wurzeln', 'wachstum', 'blüte', 'entfernt', 'geerntet'] as const;
         const dates: Date[] = [];
-        
+
         // Sammle alle vorhandenen Phasendaten
         for (const phase of phases) {
             const startDate = phaseEntity.attributes[`${phase === 'entfernt' || phase === 'geerntet' ? phase : phase + '_beginn'}`];
@@ -141,24 +141,24 @@ export class FlowerHistory extends LitElement {
                 }
             }
         }
-        
+
         // Wenn Daten vorhanden sind, nimm das früheste Datum
         if (dates.length > 0) {
             return new Date(Math.min(...dates.map(d => d.getTime())));
         }
-        
+
         return null;
     }
 
     private async _collectEvents(plantName: string): Promise<Array<TimelineEvent>> {
         if (!this.hass) return [];
-        
+
         const events: Array<TimelineEvent> = [];
         const plantEntity = this.hass.states[`plant.${plantName}`];
-        
+
         // Keine Events ohne Entität
         if (!plantEntity) return [];
-        
+
         // Verwende PlantEntityUtils, um die Pflanzen-Info zu holen
         let plantInfo: PlantInfo;
         try {
@@ -179,10 +179,10 @@ export class FlowerHistory extends LitElement {
             if (phaseEntity) {
                 const phases = ['samen', 'keimen', 'wurzeln', 'wachstum', 'blüte', 'entfernt', 'geerntet'] as const;
                 // Verwende TranslationUtils für die Phasen-Labels
-                
+
                 // Sammle alle Phasen-Events
                 const phaseEvents: TimelineEvent[] = [];
-                
+
                 for (const phase of phases) {
                     const startDate = phaseEntity?.attributes[`${phase === 'entfernt' || phase === 'geerntet' ? phase : phase + '_beginn'}`];
                     if (startDate) {
@@ -192,7 +192,7 @@ export class FlowerHistory extends LitElement {
                             label: TranslationUtils.translateGrowthPhase(this.hass, phase),
                             description: `${TranslationUtils.translateGrowthPhase(this.hass, phase)} ${TranslationUtils.translateHistory(this.hass, 'phase_started')} ${new Date(startDate).toLocaleDateString()}`
                         };
-                        
+
                         // Setze Farben für die Events
                         if (phase === 'entfernt') {
                             event.style = 'display: none;'; // Unsichtbar
@@ -202,15 +202,15 @@ export class FlowerHistory extends LitElement {
                             // Berechne die Position der Phase im Wachstumszyklus (ohne entfernt/geerntet)
                             const growthPhases = phases.filter(p => p !== 'entfernt' && p !== 'geerntet');
                             const phaseIndex = growthPhases.indexOf(phase);
-                            const lightness = growthPhases.length === 1 ? 55 : 
+                            const lightness = growthPhases.length === 1 ? 55 :
                                 55 - ((phaseIndex / Math.max(1, growthPhases.length - 1)) * 25); // Hell nach dunkel (55% bis 30%)
                             event.style = `background-color: hsl(${COLOR_CONFIG.growth.hue}, ${COLOR_CONFIG.growth.saturation}%, ${lightness}%)`;
                         }
-                        
+
                         phaseEvents.push(event);
                     }
                 }
-                
+
                 events.push(...phaseEvents);
             }
         }
@@ -228,7 +228,7 @@ export class FlowerHistory extends LitElement {
                 style: `background-color: hsl(${COLOR_CONFIG.image.hue}, ${COLOR_CONFIG.image.saturation}%, 45%);`,
                 data: { imageIndex: index, url: img.url }
             }));
-            
+
             events.push(...imageEvents);
         }
 
@@ -237,20 +237,20 @@ export class FlowerHistory extends LitElement {
             try {
                 const startTime = events[0]?.date.toISOString() || new Date().toISOString();
                 const endTime = new Date().toISOString();
-                const response = await this.hass.callApi('GET', 
+                const response = await this.hass.callApi('GET',
                     `history/period/${startTime}?filter_entity_id=${helpers.pot_size.entity_id}&end_time=${endTime}`
                 );
-                
+
                 if (response && Array.isArray(response) && response.length > 0) {
                     let lastSize: string | null = null;
                     const potSizeEvents: TimelineEvent[] = [];
-                    
+
                     // Verarbeite die Historie für Events (in chronologischer Reihenfolge)
                     const history = response[0];
                     for (let i = 0; i < history.length; i++) {
                         const state = history[i];
                         // Überspringe ungültige Werte
-                        if (!state.state || isNaN(parseFloat(state.state)) || 
+                        if (!state.state || isNaN(parseFloat(state.state)) ||
                             state.state === 'unavailable' || state.state === 'unknown') {
                             continue;
                         }
@@ -266,13 +266,13 @@ export class FlowerHistory extends LitElement {
                             lastSize = state.state;
                         }
                     }
-                    
+
                     // Setze Farben für Topfgrößen-Events (hell nach dunkel)
                     potSizeEvents.forEach((event, index) => {
                         const lightness = 65 - (index * 10); // Start bei 65%, jeder weitere 10% dunkler
                         event.style = `background-color: hsl(${COLOR_CONFIG.pot.hue}, ${COLOR_CONFIG.pot.saturation}%, ${lightness}%)`;
                     });
-                    
+
                     events.push(...potSizeEvents);
                 }
             } catch {
@@ -289,13 +289,13 @@ export class FlowerHistory extends LitElement {
                 label: entry.area,
                 description: `${TranslationUtils.translateHistory(this.hass, 'moved_to')} ${entry.area} ${new Date(entry.date).toLocaleDateString()}`
             } as TimelineEvent));
-            
+
             // Setze Farben für Area-Events
             areaEvents.forEach((event, index) => {
                 const lightness = 65 - (index * 10); // Start bei 65%, jeder weitere 10% dunkler
                 event.style = `background-color: hsl(${COLOR_CONFIG.area.hue}, ${COLOR_CONFIG.area.saturation}%, ${lightness}%)`;
             });
-            
+
             events.push(...areaEvents);
         }
 
@@ -304,10 +304,10 @@ export class FlowerHistory extends LitElement {
             try {
                 const startTime = events[0]?.date.toISOString() || new Date().toISOString();
                 const endTime = new Date().toISOString();
-                const response = await this.hass.callApi('GET', 
+                const response = await this.hass.callApi('GET',
                     `history/period/${startTime}?filter_entity_id=${helpers.treatment.entity_id}&end_time=${endTime}`
                 );
-                
+
                 if (response && Array.isArray(response) && response.length > 0) {
                     const treatmentEvents: TimelineEvent[] = [];
                     const history = response[0];
@@ -324,14 +324,14 @@ export class FlowerHistory extends LitElement {
                             });
                         }
                     }
-                    
+
                     // Setze Farben für Treatment-Events (hell nach dunkel)
                     treatmentEvents.forEach((event, index) => {
                         // Berechne die Helligkeit, startend bei 80%, reduziert um 8% pro Event, minimal 0%
                         const lightness = Math.max(80 - (index * 8), 0);
                         event.style = `background-color: hsl(${COLOR_CONFIG.treatment.hue}, ${COLOR_CONFIG.treatment.saturation}%, ${lightness}%);`;
                     });
-                    
+
                     events.push(...treatmentEvents);
                 }
             } catch {
@@ -342,19 +342,19 @@ export class FlowerHistory extends LitElement {
         // Lade Journal-Einträge
         if (showGroups.includes(EVENT_TYPES.JOURNAL)) {
             const journalEntityId = helpers.journal?.entity_id;
-            
+
             if (journalEntityId) {
                 try {
                     const startTime = new Date(new Date().setMonth(new Date().getMonth() - 6)).toISOString();
                     const endTime = new Date().toISOString();
-                    const response = await this.hass.callApi('GET', 
+                    const response = await this.hass.callApi('GET',
                         `history/period/${startTime}?filter_entity_id=${journalEntityId}&end_time=${endTime}`
                     );
-                    
+
                     if (response && Array.isArray(response) && response.length > 0) {
                         const journalHistory = response[0];
                         let lastJournalText = '';
-                        
+
                         for (let i = 0; i < journalHistory.length; i++) {
                             const state = journalHistory[i];
                             if (state.state && state.state !== 'unavailable' && state.state !== 'unknown' && state.state !== lastJournalText) {
@@ -387,20 +387,20 @@ export class FlowerHistory extends LitElement {
     // Einheitliche Funktion für Animationen
     private _animateElement(element: HTMLElement | null, open: boolean, onComplete?: () => void): void {
         if (!element) return;
-        
+
         if (open) {
             // Öffnen: Von 0 auf scrollHeight
             element.classList.remove('closing', 'expanded');
             element.style.height = '0';
-            
+
             // Force reflow
             void element.offsetHeight;
-            
+
             // Setze die Höhe und füge die expanded-Klasse hinzu
             const height = element.scrollHeight;
             element.style.height = `${height}px`;
             element.classList.add('expanded');
-            
+
             // Optional: Callback nach Animation
             if (onComplete) {
                 setTimeout(onComplete, 300);
@@ -409,15 +409,15 @@ export class FlowerHistory extends LitElement {
             // Schließen: Von aktueller Höhe auf 0
             element.style.height = `${element.scrollHeight}px`;
             void element.offsetHeight; // Force reflow
-            
+
             element.classList.remove('expanded');
             element.classList.add('closing');
-            
+
             // Nach der Animation die Klassen entfernen
             setTimeout(() => {
                 element.classList.remove('closing');
                 element.style.height = '0';
-                
+
                 // Optional: Callback nach Animation
                 if (onComplete) {
                     onComplete();
@@ -429,7 +429,7 @@ export class FlowerHistory extends LitElement {
     private _toggleJournalExpand(eventId: string): void {
         const newSet = new Set(this._expandedJournalIds);
         const journalElement = this.shadowRoot?.querySelector(`#journal-${eventId}`) as HTMLElement;
-        
+
         if (newSet.has(eventId)) {
             // Schließen
             this._animateElement(journalElement, false, () => {
@@ -440,7 +440,7 @@ export class FlowerHistory extends LitElement {
             // Öffnen
             newSet.add(eventId);
             this._expandedJournalIds = newSet;
-            
+
             // Kurze Verzögerung, damit das DOM aktualisiert wird
             setTimeout(() => {
                 const el = this.shadowRoot?.querySelector(`#journal-${eventId}`) as HTMLElement;
@@ -455,15 +455,15 @@ export class FlowerHistory extends LitElement {
             // Wenn bereits eine Aktion ausgewählt ist, setzen wir sie zurück
             const formElement = this.shadowRoot?.querySelector('.form-content') as HTMLElement;
             const headerElement = this.shadowRoot?.querySelector('.add-header') as HTMLElement;
-            
+
             if (formElement) {
                 formElement.classList.remove('visible');
             }
-            
+
             if (headerElement) {
                 headerElement.classList.remove('visible');
             }
-            
+
             // Warte auf das Ende der Ausblend-Animation
             setTimeout(() => {
                 this._selectedAddAction = null;
@@ -475,21 +475,21 @@ export class FlowerHistory extends LitElement {
             // Öffnen/Schließen des Menüs
             this._addMenuOpen = !this._addMenuOpen;
             this._newEntryValue = '';
-            
+
             if (this._addMenuOpen) {
                 // Menü öffnen
                 this.requestUpdate();
-                
+
                 // Warte auf DOM-Update
                 setTimeout(() => {
                     const menuContainer = this.shadowRoot?.querySelector('.add-menu-container') as HTMLElement;
                     const menuOptions = this.shadowRoot?.querySelector('.add-menu-options') as HTMLElement;
-                    
+
                     if (menuContainer && menuOptions) {
                         // Setze die Höhe des Containers
                         const height = menuOptions.scrollHeight;
                         menuContainer.style.height = `${height}px`;
-                        
+
                         // Zeige die Optionen an
                         setTimeout(() => {
                             menuOptions.classList.add('visible');
@@ -500,27 +500,27 @@ export class FlowerHistory extends LitElement {
                 // Menü schließen
                 const menuContainer = this.shadowRoot?.querySelector('.add-menu-container') as HTMLElement;
                 const menuOptions = this.shadowRoot?.querySelector('.add-menu-options') as HTMLElement;
-                
+
                 if (menuOptions) {
                     menuOptions.classList.remove('visible');
                 }
-                
+
                 if (menuContainer) {
                     menuContainer.style.height = '0';
                 }
             }
         }
     }
-    
+
     private _selectAddAction(action: string): void {
         // Setze den ausgewählten Aktionstyp
         this._selectedAddAction = action;
         this._newEntryValue = '';
-        
+
         // Finde alle Optionen und markiere die ausgewählte
         const options = this.shadowRoot?.querySelectorAll('.add-option') as NodeListOf<HTMLElement>;
         const selectedOption = this.shadowRoot?.querySelector(`.add-option[data-action="${action}"]`) as HTMLElement;
-        
+
         if (options && selectedOption) {
             // Fade-out Animation für nicht ausgewählte Optionen
             options.forEach(option => {
@@ -530,30 +530,30 @@ export class FlowerHistory extends LitElement {
                     option.classList.add('selected');
                 }
             });
-            
+
             // Warte auf das Ende der Ausblend-Animation
             setTimeout(() => {
                 // Bewege die ausgewählte Option nach oben
                 selectedOption.classList.add('move-to-header');
-                
+
                 // Warte auf das Ende der Bewegungsanimation
                 setTimeout(() => {
                     // Aktualisiere den Zustand, um das Formular anzuzeigen
                     this.requestUpdate();
-                    
+
                     // Warte auf DOM-Update
                     setTimeout(() => {
                         // Zeige Header und Formular an
                         const headerElement = this.shadowRoot?.querySelector('.add-header') as HTMLElement;
                         const formElement = this.shadowRoot?.querySelector('.form-content') as HTMLElement;
-                        
+
                         if (headerElement) {
                             headerElement.classList.add('visible');
                         }
-                        
+
                         if (formElement) {
                             formElement.classList.add('visible');
-                            
+
                             // Fokussiere das erste Eingabefeld
                             const firstInput = formElement.querySelector('input, select, textarea') as HTMLElement;
                             if (firstInput) {
@@ -565,53 +565,53 @@ export class FlowerHistory extends LitElement {
             }, 300);
         }
     }
-    
+
     private async _addNewEntry(): Promise<void> {
         if (!this.hass || !this.entityId || !this._selectedAddAction) {
             return;
         }
-        
+
         if (!this._newEntryValue) {
             return;
         }
-        
+
         this._addingEntry = true;
-        
+
         try {
             // PlantEntityUtils verwenden, um die Entity-IDs zu erhalten
             const plantInfo = await PlantEntityUtils.getPlantInfo(this.hass, this.entityId);
-            
+
             if (!plantInfo) {
                 this._addingEntry = false;
                 return;
             }
-            
+
             const helpers = (plantInfo as PlantInfo).helpers || {};
-            
+
             // Entity-IDs extrahieren ohne Fallbacks
             const phaseEntityId = helpers.growth_phase?.entity_id;
             const potSizeEntityId = helpers.pot_size?.entity_id;
             const treatmentEntityId = helpers.treatment?.entity_id;
             const journalEntityId = helpers.journal?.entity_id;
-            
+
             // Je nach Aktion den entsprechenden Service aufrufen
             switch (this._selectedAddAction) {
                 case ADD_ACTIONS.PHASE: {
                     if (!phaseEntityId) {
                         break;
                     }
-                    
+
                     // Wachstumsphase ändern
                     await this.hass.callService('select', 'select_option', {
                         entity_id: phaseEntityId,
                         option: this._newEntryValue
                     });
-                    
+
                     // Datum der Phase setzen (aktuelles Datum)
-                    const phaseAttribute = this._newEntryValue === 'entfernt' || this._newEntryValue === 'geerntet' 
-                        ? this._newEntryValue 
+                    const phaseAttribute = this._newEntryValue === 'entfernt' || this._newEntryValue === 'geerntet'
+                        ? this._newEntryValue
                         : `${this._newEntryValue}_beginn`;
-                    
+
                     await this.hass.callService('homeassistant', 'update_entity_attribute', {
                         entity_id: phaseEntityId,
                         attribute: phaseAttribute,
@@ -619,14 +619,14 @@ export class FlowerHistory extends LitElement {
                     });
                     break;
                 }
-                    
+
                 case ADD_ACTIONS.AREA: {
                     // Bereich ändern
                     const areaName = this._newEntryValue;
                     const areaId = areaName === '-' ? '' : Object.entries(this.hass.areas || {})
                         .find(([, area]) => area.name === areaName)?.[0];
                     const entity = this.hass.entities[this.entityId];
-                    
+
                     if (entity?.device_id) {
                         await this.hass.callService('plant', 'move_to_area', {
                             device_id: entity.device_id,
@@ -635,36 +635,36 @@ export class FlowerHistory extends LitElement {
                     }
                     break;
                 }
-                    
+
                 case ADD_ACTIONS.POT:
                     if (!potSizeEntityId) {
                         break;
                     }
-                    
+
                     // Topfgröße ändern
                     await this.hass.callService('number', 'set_value', {
                         entity_id: potSizeEntityId,
                         value: parseFloat(this._newEntryValue)
                     });
                     break;
-                    
+
                 case ADD_ACTIONS.TREATMENT:
                     if (!treatmentEntityId) {
                         break;
                     }
-                    
+
                     // Behandlung setzen
                     await this.hass.callService('select', 'select_option', {
                         entity_id: treatmentEntityId,
                         option: this._newEntryValue
                     });
                     break;
-                    
+
                 case ADD_ACTIONS.JOURNAL:
                     if (!journalEntityId) {
                         break;
                     }
-                    
+
                     // Journal-Eintrag hinzufügen
                     await this.hass.callService('text', 'set_value', {
                         entity_id: journalEntityId,
@@ -672,44 +672,44 @@ export class FlowerHistory extends LitElement {
                     });
                     break;
             }
-            
+
             // Erfolgsanimation anzeigen
             this._newEntryAdded = true;
-            
+
             // Warte kurz, damit der Benutzer die Erfolgsanimation sehen kann
             setTimeout(() => {
                 // Zurücksetzen und Events aktualisieren
                 this._newEntryAdded = false;
                 this._addingEntry = false;
-                
+
                 // Vollständiges Zurücksetzen des Zustands
                 const formElement = this.shadowRoot?.querySelector('.form-content') as HTMLElement;
                 const headerElement = this.shadowRoot?.querySelector('.add-header') as HTMLElement;
-                
+
                 if (formElement) {
                     formElement.classList.remove('visible');
                 }
-                
+
                 if (headerElement) {
                     headerElement.classList.remove('visible');
                 }
-                
+
                 // Warte auf das Ende der Ausblend-Animation
                 setTimeout(() => {
                     this._selectedAddAction = null;
                     this._newEntryValue = '';
                     this._addMenuOpen = false;
-                    
+
                     // Events aktualisieren
                     this._updateEvents();
                 }, 300);
             }, 1000);
-            
+
         } catch {
             this._addingEntry = false;
         }
     }
-    
+
     private _handleKeyDown(e: KeyboardEvent): void {
         e.stopPropagation();
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -721,7 +721,7 @@ export class FlowerHistory extends LitElement {
     // Hilfsmethoden für das Hinzufügen neuer Einträge
     private _getIconForAction(action: string | null): string {
         if (!action) return '';
-        
+
         switch (action) {
             case ADD_ACTIONS.PHASE:
                 return 'mdi:sprout';
@@ -737,10 +737,10 @@ export class FlowerHistory extends LitElement {
                 return '';
         }
     }
-    
+
     private _getColorForAction(action: string | null): string {
         if (!action) return '';
-        
+
         switch (action) {
             case ADD_ACTIONS.PHASE:
                 return `${COLOR_CONFIG.growth.hue}, ${COLOR_CONFIG.growth.saturation}%, 45%`;
@@ -756,10 +756,10 @@ export class FlowerHistory extends LitElement {
                 return '';
         }
     }
-    
+
     private _getLabelForAction(action: string | null): string {
         if (!action || !this.hass) return '';
-        
+
         switch (action) {
             case ADD_ACTIONS.PHASE:
                 return TranslationUtils.translateHistory(this.hass, 'growth_phase');
@@ -775,13 +775,13 @@ export class FlowerHistory extends LitElement {
                 return '';
         }
     }
-    
+
     private _renderFormForAction(action: string | null): TemplateResult {
         if (!action) return html``;
-        
+
         // Gemeinsame Event-Handler für alle Formulartypen
         const handleClick = (e: Event) => e.stopPropagation();
-        
+
         // Handler für Dropdown-Änderungen
         const handleSelectChange = (e: Event) => {
             e.stopPropagation();
@@ -791,13 +791,13 @@ export class FlowerHistory extends LitElement {
                 this._addNewEntry();
             }
         };
-        
+
         // Handler für Texteingaben
         const handleInput = (e: Event) => {
             e.stopPropagation();
             this._newEntryValue = (e.target as HTMLInputElement | HTMLTextAreaElement).value;
         };
-        
+
         // Handler für Tastatureingaben (Enter)
         const handleKeyDown = (e: KeyboardEvent) => {
             e.stopPropagation();
@@ -808,7 +808,7 @@ export class FlowerHistory extends LitElement {
                 }
             }
         };
-        
+
         // Handler für Verlassen des Feldes
         const handleBlur = (e: Event) => {
             e.stopPropagation();
@@ -816,18 +816,18 @@ export class FlowerHistory extends LitElement {
                 this._addNewEntry();
             }
         };
-        
+
         // Rendere das entsprechende Eingabefeld basierend auf dem Aktionstyp
         switch (action) {
             case ADD_ACTIONS.PHASE:
                 return html`
                     <div class="form-field">
-                        <select id="phase-select" 
+                        <select id="phase-select"
                             @click=${handleClick}
                             @change=${handleSelectChange}
                         >
                             <option value="" disabled selected>${TranslationUtils.translateHistory(this.hass!, 'please_select')}</option>
-                            <option value="seed">${TranslationUtils.translateGrowthPhase(this.hass!, 'seed')}</option>
+                            <option value="seeds">${TranslationUtils.translateGrowthPhase(this.hass!, 'seeds')}</option>
                             <option value="germination">${TranslationUtils.translateGrowthPhase(this.hass!, 'germination')}</option>
                             <option value="rooting">${TranslationUtils.translateGrowthPhase(this.hass!, 'rooting')}</option>
                             <option value="growth">${TranslationUtils.translateGrowthPhase(this.hass!, 'growth')}</option>
@@ -837,16 +837,16 @@ export class FlowerHistory extends LitElement {
                         </select>
                     </div>
                 `;
-                
+
             case ADD_ACTIONS.AREA: {
                 // Hole alle verfügbaren Räume aus dem hass-Objekt
                 const areas = Object.values(this.hass?.areas || {})
                     .map(area => area.name)
                     .sort((a, b) => a.localeCompare(b, 'de'));
-                
+
                 return html`
                     <div class="form-field">
-                        <select id="area-select" 
+                        <select id="area-select"
                             @click=${handleClick}
                             @change=${handleSelectChange}
                         >
@@ -857,15 +857,15 @@ export class FlowerHistory extends LitElement {
                     </div>
                 `;
             }
-                
+
             case ADD_ACTIONS.POT:
                 return html`
                     <div class="form-field">
-                        <input type="number" 
-                            id="pot-input" 
-                            min="0.1" 
-                            step="0.1" 
-                            placeholder="${TranslationUtils.translateHistory(this.hass!, 'pot_size_placeholder')}" 
+                        <input type="number"
+                            id="pot-input"
+                            min="0.1"
+                            step="0.1"
+                            placeholder="${TranslationUtils.translateHistory(this.hass!, 'pot_size_placeholder')}"
                             @click=${handleClick}
                             @input=${handleInput}
                             @keydown=${handleKeyDown}
@@ -873,11 +873,11 @@ export class FlowerHistory extends LitElement {
                         >
                     </div>
                 `;
-                
+
             case ADD_ACTIONS.TREATMENT:
                 return html`
                     <div class="form-field">
-                        <select id="treatment-select" 
+                        <select id="treatment-select"
                             @click=${handleClick}
                             @change=${handleSelectChange}
                         >
@@ -893,29 +893,29 @@ export class FlowerHistory extends LitElement {
                         </select>
                     </div>
                 `;
-                
+
             case ADD_ACTIONS.JOURNAL:
                 return html`
                     <div class="form-field">
-                        <textarea id="journal-input" 
-                            placeholder="${TranslationUtils.translateHistory(this.hass!, 'journal_placeholder')}" 
+                        <textarea id="journal-input"
+                            placeholder="${TranslationUtils.translateHistory(this.hass!, 'journal_placeholder')}"
                             @click=${handleClick}
                             @input=${handleInput}
                         ></textarea>
                     </div>
                     <div class="journal-submit">
-                        <ha-icon-button 
-                            icon="mdi:send" 
-                            @click=${(e: Event) => { 
-                                e.stopPropagation(); 
-                                this._addNewEntry(); 
+                        <ha-icon-button
+                            icon="mdi:send"
+                            @click=${(e: Event) => {
+                                e.stopPropagation();
+                                this._addNewEntry();
                             }}
                             ?disabled=${!this._newEntryValue}
                             title="${TranslationUtils.translateUI(this.hass!, 'confirm')}"
                         ></ha-icon-button>
                     </div>
                 `;
-                
+
             default:
                 return html``;
         }
@@ -926,7 +926,7 @@ export class FlowerHistory extends LitElement {
 
         // Standardmäßig alle Gruppen anzeigen, wenn keine Konfiguration vorhanden ist
         const showGroups = this.historyGroups || Object.values(EVENT_TYPES);
-        
+
         // CSS-Klasse für die Position der Linie
         const timelinePositionClass = this.linePosition === 'right' ? 'timeline-right' : '';
 
@@ -934,7 +934,7 @@ export class FlowerHistory extends LitElement {
             <div class="history-container">
                 <div class="vertical-timeline ${timelinePositionClass}">
                     <div class="timeline-line" style="background-color: hsl(${COLOR_CONFIG.growth.hue}, ${COLOR_CONFIG.growth.saturation}%, 45%);"></div>
-                    
+
                     <!-- Hinzufügen-Button am Anfang der Timeline -->
                     <div class="phase-item add-item" @click=${this._toggleAddMenu}>
                         <div class="phase-dot add-dot" style="background-color: hsl(${COLOR_CONFIG.add.hue}, ${COLOR_CONFIG.add.saturation}%, 45%);">
@@ -945,35 +945,35 @@ export class FlowerHistory extends LitElement {
                                 <!-- Header mit ausgewählter Aktion -->
                                 <div class="add-header">
                                     <div class="add-header-title">
-                                        <ha-icon icon="${this._getIconForAction(this._selectedAddAction)}" 
+                                        <ha-icon icon="${this._getIconForAction(this._selectedAddAction)}"
                                                 style="color: hsl(${this._getColorForAction(this._selectedAddAction)});">
                                         </ha-icon>
                                         <span>${this._getLabelForAction(this._selectedAddAction)}</span>
                                     </div>
-                                    <ha-icon-button 
-                                        icon="mdi:close" 
-                                        @click=${(e: Event) => { 
-                                            e.stopPropagation(); 
+                                    <ha-icon-button
+                                        icon="mdi:close"
+                                        @click=${(e: Event) => {
+                                            e.stopPropagation();
                                             this._toggleAddMenu();
                                         }}
                                     ></ha-icon-button>
                                 </div>
-                                
+
                                 <!-- Formular zum Hinzufügen des ausgewählten Eintrags -->
                                 <div class="form-content" @click=${(e: Event) => e.stopPropagation()}>
                                     ${this._renderFormForAction(this._selectedAddAction)}
-                                    
-                                    ${this._selectedAddAction !== ADD_ACTIONS.JOURNAL && 
-                                      this._selectedAddAction !== ADD_ACTIONS.PHASE && 
+
+                                    ${this._selectedAddAction !== ADD_ACTIONS.JOURNAL &&
+                                      this._selectedAddAction !== ADD_ACTIONS.PHASE &&
                                       this._selectedAddAction !== ADD_ACTIONS.TREATMENT &&
                                       this._selectedAddAction !== ADD_ACTIONS.AREA &&
                                       this._selectedAddAction !== ADD_ACTIONS.POT ? html`
                                         <div class="form-actions">
-                                            <ha-icon-button 
-                                                icon="mdi:check" 
-                                                @click=${(e: Event) => { 
-                                                    e.stopPropagation(); 
-                                                    this._addNewEntry(); 
+                                            <ha-icon-button
+                                                icon="mdi:check"
+                                                @click=${(e: Event) => {
+                                                    e.stopPropagation();
+                                                    this._addNewEntry();
                                                 }}
                                                 ?disabled=${this._addingEntry || !this._newEntryValue}
                                                 class="${this._newEntryAdded ? 'success' : ''}"
@@ -987,7 +987,7 @@ export class FlowerHistory extends LitElement {
                                 <div class="phase-header">
                                     <div class="phase-name">${TranslationUtils.translateHistory(this.hass!, 'add_entry')}</div>
                                 </div>
-                                
+
                                 <!-- Menü zum Hinzufügen neuer Einträge -->
                                 <div class="add-menu-container ${this._addMenuOpen ? 'expanded' : ''}">
                                     <div class="add-menu-options">
@@ -1026,7 +1026,7 @@ export class FlowerHistory extends LitElement {
                             `}
                         </div>
                     </div>
-                    
+
                     ${this._renderEvents()}
                 </div>
             </div>
@@ -1062,18 +1062,18 @@ export class FlowerHistory extends LitElement {
                 // Bestimme Farbe und Icon basierend auf Event-Typ
                 let dotColor = '';
                 let icon = '';
-                
+
                 // Prüfe, ob es sich um eine Growth Phase handelt
                 const isGrowthPhase = event.type.startsWith('phase-');
                 const isJournal = event.type === 'journal';
-                
+
                 // Generiere eine eindeutige ID für das Event
                 const eventId = `event-${index}-${event.type}-${event.date.getTime()}`;
                 const isExpanded = this._expandedJournalIds.has(eventId);
-                
+
                 // Variable für den Hintergrundverlauf
                 let bgColor = '';
-                
+
                 if (isGrowthPhase) {
                     dotColor = event.style || `background-color: hsl(${COLOR_CONFIG.growth.hue}, ${COLOR_CONFIG.growth.saturation}%, 45%);`;
                     // Extrahiere die Farbe für den Hintergrundverlauf und mache sie transparenter
@@ -1087,10 +1087,10 @@ export class FlowerHistory extends LitElement {
                         // Verwende eine Standard-Farbe mit niedriger Transparenz
                         bgColor = `--milestone-color: hsla(${COLOR_CONFIG.growth.hue}, ${COLOR_CONFIG.growth.saturation}%, 45%, 0.15)`;
                     }
-                    
+
                     // Extrahiere die Phase aus dem Event-Typ (z.B. 'phase-samen' -> 'samen')
                     const phase = event.type.split('-')[1];
-                    
+
                     // Verwende die zentrale Icon-Definition mit index-basierter Logik
                     const plantName = this.entityId?.split('.')[1];
                     const plantEntity = plantName ? this.hass.states[`plant.${plantName}`] : undefined;
@@ -1129,11 +1129,11 @@ export class FlowerHistory extends LitElement {
                     // Setze die Startzeit auf Mitternacht des Starttages
                     const startDate = new Date(this._plantingDate);
                     startDate.setHours(0, 0, 0, 0);
-                    
+
                     // Berechne die Differenz in Tagen
                     const diffTime = Math.abs(new Date(event.date).getTime() - startDate.getTime());
                     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    
+
                     // Formatiere als "[Tag] | [Datum]"
                     dateDisplay = `${diffDays} | ${dateDisplay}`;
                 }

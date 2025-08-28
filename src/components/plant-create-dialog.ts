@@ -51,18 +51,18 @@ class PlantCreateDialogClass extends LitElement {
         service_data: data,
         return_response: true  // Wichtig: Explizit nach einer Antwort fragen
       }) as { response?: { entity_id?: string; device_id?: string } };
-      
+
       // Die Antwort sollte direkt die entity_id und device_id enthalten
       if (response && response.response) {
         const { entity_id, device_id } = response.response;
-        
+
         if (entity_id && device_id) {
           // Setze die Position und den Bereich direkt hier
           // Das Event plant-created wird jetzt in _setPositionAndArea gesendet
           await this._setPositionAndArea(entity_id, device_id, this.position, this.areaId);
         }
       }
-      
+
       this.closeDialog();
     } catch {
       // Fehler ignorieren
@@ -72,28 +72,28 @@ class PlantCreateDialogClass extends LitElement {
   // Hilfsmethode zum Setzen der Position und des Bereichs
   private async _setPositionAndArea(entityId: string, deviceId: string, position: {x: number, y: number}, areaId?: string) {
     if (!this.hass) return;
-    
+
     try {
       // Die Position wird jetzt von der Flower-Area-Komponente normalisiert
       // Wir senden ein Event mit den ursprünglichen Koordinaten
       this.dispatchEvent(new CustomEvent('plant-created', {
         bubbles: true,
         composed: true,
-        detail: { 
-          entity_id: entityId, 
+        detail: {
+          entity_id: entityId,
           device_id: deviceId,
           position: position, // Originale Position, kann auch negativ sein
           area_id: areaId
         }
       }));
-      
+
       // Nur den Bereich setzen, wenn area_id verfügbar
       if (areaId) {
         // Einfach zu lowercase konvertieren und Umlaute ersetzen
         const formattedAreaId = areaId.toLowerCase()
           .replace(/ä/g, 'a').replace(/ö/g, 'o').replace(/ü/g, 'u')
           .replace(/ß/g, 'ss');
-        
+
         await this.hass.callService('plant', 'move_to_area', {
           device_id: [deviceId],
           area_id: formattedAreaId
@@ -134,7 +134,7 @@ class PlantCreateDialogClass extends LitElement {
             <div class="form-field">
               <label for="growth_phase">Wachstumsphase</label>
               <select id="growth_phase" name="growth_phase" required>
-                <option value="seed">${TranslationUtils.translateGrowthPhase(this.hass, 'seed')}</option>
+                <option value="seeds">${TranslationUtils.translateGrowthPhase(this.hass, 'seeds')}</option>
                 <option value="germination">${TranslationUtils.translateGrowthPhase(this.hass, 'germination')}</option>
                 <option value="rooting" selected>${TranslationUtils.translateGrowthPhase(this.hass, 'rooting')}</option>
                 <option value="growth">${TranslationUtils.translateGrowthPhase(this.hass, 'growth')}</option>
@@ -143,7 +143,7 @@ class PlantCreateDialogClass extends LitElement {
                 <option value="harvested">${TranslationUtils.translateGrowthPhase(this.hass, 'harvested')}</option>
               </select>
             </div>
-            
+
             <div class="form-field">
               <label for="temperature_sensor">Temperatursensor</label>
               <select id="temperature_sensor" name="temperature_sensor">
@@ -151,8 +151,8 @@ class PlantCreateDialogClass extends LitElement {
                 ${Object.entries(this.hass.states)
                   .filter(([id, entity]) => {
                     const hassEntity = entity as HassEntity;
-                    return id.startsWith('sensor.') && 
-                      hassEntity.attributes && 
+                    return id.startsWith('sensor.') &&
+                      hassEntity.attributes &&
                       hassEntity.attributes.device_class === 'temperature';
                   })
                   .map(([id, entity]) => {
@@ -162,7 +162,7 @@ class PlantCreateDialogClass extends LitElement {
                 }
               </select>
             </div>
-            
+
             <div class="form-field">
               <label for="moisture_sensor">Feuchtigkeitssensor</label>
               <select id="moisture_sensor" name="moisture_sensor">
@@ -170,8 +170,8 @@ class PlantCreateDialogClass extends LitElement {
                 ${Object.entries(this.hass.states)
                   .filter(([id, entity]) => {
                     const hassEntity = entity as HassEntity;
-                    return id.startsWith('sensor.') && 
-                      hassEntity.attributes && 
+                    return id.startsWith('sensor.') &&
+                      hassEntity.attributes &&
                       hassEntity.attributes.device_class === 'moisture';
                   })
                   .map(([id, entity]) => {
@@ -181,7 +181,7 @@ class PlantCreateDialogClass extends LitElement {
                 }
               </select>
             </div>
-            
+
             <div class="form-field">
               <label for="conductivity_sensor">Leitfähigkeitssensor</label>
               <select id="conductivity_sensor" name="conductivity_sensor">
@@ -189,8 +189,8 @@ class PlantCreateDialogClass extends LitElement {
                 ${Object.entries(this.hass.states)
                   .filter(([id, entity]) => {
                     const hassEntity = entity as HassEntity;
-                    return id.startsWith('sensor.') && 
-                      hassEntity.attributes && 
+                    return id.startsWith('sensor.') &&
+                      hassEntity.attributes &&
                       hassEntity.attributes.device_class === 'conductivity';
                   })
                   .map(([id, entity]) => {
@@ -200,7 +200,7 @@ class PlantCreateDialogClass extends LitElement {
                 }
               </select>
             </div>
-            
+
             <div class="form-field">
               <label for="ph_sensor">pH-Sensor</label>
               <select id="ph_sensor" name="ph_sensor">
@@ -208,8 +208,8 @@ class PlantCreateDialogClass extends LitElement {
                 ${Object.entries(this.hass.states)
                   .filter(([id, entity]) => {
                     const hassEntity = entity as HassEntity;
-                    return id.startsWith('sensor.') && 
-                      hassEntity.attributes && 
+                    return id.startsWith('sensor.') &&
+                      hassEntity.attributes &&
                       hassEntity.attributes.device_class === 'ph';
                   })
                   .map(([id, entity]) => {
@@ -219,7 +219,7 @@ class PlantCreateDialogClass extends LitElement {
                 }
               </select>
             </div>
-            
+
             <div class="form-field">
               <label for="illuminance_sensor">Helligkeitssensor</label>
               <select id="illuminance_sensor" name="illuminance_sensor">
@@ -227,8 +227,8 @@ class PlantCreateDialogClass extends LitElement {
                 ${Object.entries(this.hass.states)
                   .filter(([id, entity]) => {
                     const hassEntity = entity as HassEntity;
-                    return id.startsWith('sensor.') && 
-                      hassEntity.attributes && 
+                    return id.startsWith('sensor.') &&
+                      hassEntity.attributes &&
                       hassEntity.attributes.device_class === 'illuminance';
                   })
                   .map(([id, entity]) => {
@@ -238,7 +238,7 @@ class PlantCreateDialogClass extends LitElement {
                 }
               </select>
             </div>
-            
+
             <div class="form-field">
               <label for="humidity_sensor">Luftfeuchtigkeitssensor</label>
               <select id="humidity_sensor" name="humidity_sensor">
@@ -246,8 +246,8 @@ class PlantCreateDialogClass extends LitElement {
                 ${Object.entries(this.hass.states)
                   .filter(([id, entity]) => {
                     const hassEntity = entity as HassEntity;
-                    return id.startsWith('sensor.') && 
-                      hassEntity.attributes && 
+                    return id.startsWith('sensor.') &&
+                      hassEntity.attributes &&
                       hassEntity.attributes.device_class === 'humidity';
                   })
                   .map(([id, entity]) => {
@@ -257,7 +257,7 @@ class PlantCreateDialogClass extends LitElement {
                 }
               </select>
             </div>
-            
+
             <div class="form-field">
               <label for="power_consumption_sensor">Energieverbrauchssensor</label>
               <select id="power_consumption_sensor" name="power_consumption_sensor">
@@ -265,8 +265,8 @@ class PlantCreateDialogClass extends LitElement {
                 ${Object.entries(this.hass.states)
                   .filter(([id, entity]) => {
                     const hassEntity = entity as HassEntity;
-                    return id.startsWith('sensor.') && 
-                      hassEntity.attributes && 
+                    return id.startsWith('sensor.') &&
+                      hassEntity.attributes &&
                       hassEntity.attributes.device_class === 'energy';
                   })
                   .map(([id, entity]) => {
@@ -276,7 +276,7 @@ class PlantCreateDialogClass extends LitElement {
                 }
               </select>
             </div>
-            
+
             <div class="form-actions">
               <button type="button" @click=${this.closeDialog}>Abbrechen</button>
               <button type="submit">Erstellen</button>
@@ -301,7 +301,7 @@ class PlantCreateDialogClass extends LitElement {
         align-items: center;
         z-index: 9999;
       }
-      
+
       .dialog-content {
         background-color: var(--card-background-color, #fff);
         border-radius: 8px;
@@ -312,19 +312,19 @@ class PlantCreateDialogClass extends LitElement {
         overflow-y: auto;
         padding: 1.5rem;
       }
-      
+
       .dialog-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
         margin-bottom: 1rem;
       }
-      
+
       .dialog-header h2 {
         margin: 0;
         font-size: 1.5rem;
       }
-      
+
       .close-button {
         background: none;
         border: none;
@@ -336,17 +336,17 @@ class PlantCreateDialogClass extends LitElement {
         width: 2rem;
         height: 2rem;
       }
-      
+
       .form-field {
         margin-bottom: 1rem;
       }
-      
+
       label {
         display: block;
         margin-bottom: 0.3rem;
         font-weight: 500;
       }
-      
+
       input, select {
         width: 100%;
         padding: 0.5rem;
@@ -354,14 +354,14 @@ class PlantCreateDialogClass extends LitElement {
         border-radius: 4px;
         font-size: 1rem;
       }
-      
+
       .form-actions {
         display: flex;
         justify-content: flex-end;
         gap: 0.5rem;
         margin-top: 1.5rem;
       }
-      
+
       button {
         cursor: pointer;
         padding: 0.5rem 1rem;
@@ -369,7 +369,7 @@ class PlantCreateDialogClass extends LitElement {
         font-size: 1rem;
         border: none;
       }
-      
+
       button[type="submit"] {
         background-color: var(--primary-color);
         color: white;
@@ -384,6 +384,6 @@ if (!isElementDefined) {
 }
 
 // Exportiere die Klasse (entweder neu definiert oder bereits existierend)
-export const PlantCreateDialog = isElementDefined 
+export const PlantCreateDialog = isElementDefined
   ? customElements.get('plant-create-dialog') as CustomElementConstructor
-  : PlantCreateDialogClass; 
+  : PlantCreateDialogClass;
