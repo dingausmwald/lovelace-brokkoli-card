@@ -1,0 +1,1 @@
+(()=>{"use strict";console.info("%c BROKKOLI %c brokkoli-sensor-assignment-card.js ist leer — die Karte ist in brokkoli-card.js enthalten. Der Resource-Eintrag kann entfernt werden.","color: cyan; background: black; font-weight: bold;","color: darkblue; background: white;")})();

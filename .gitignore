@@ -158,3 +158,6 @@ Thumbs.db
 dist/
 build/
 *.tgz
+
+# Zeitgestempelte Test-Builds fuer die Dev-VM (Cache-Busting), gehoeren nicht ins Repo
+brokkoli-card-v*.js

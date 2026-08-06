@@ -20,7 +20,7 @@ jobs:
           path: './'
       - name: "🏷️ Get version tag"
         id: set_var
-        run: echo "COMPONENT_VERSION=$(grep version package.json | cut -d ":" -f 2 | sed -e 's/[^0-9\.beta\-]//g')" >> $GITHUB_ENV
+        run: echo "COMPONENT_VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_ENV
 
       - name: "🏷️ Check if tag exists already"
         uses: mukunku/tag-exists-action@v1.4.0
@@ -41,7 +41,6 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '20.x'
-      - run: npm install
       - run: npm ci
       - run: npm run build --if-present
 
@@ -49,10 +48,16 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add flower-card.js
-          git add flower-card.js.gz
+          git add brokkoli-card.js brokkoli-card.js.gz brokkoli-card.js.LICENSE.txt
+          git add brokkoli-area-card.js brokkoli-area-card.js.gz
+          git add brokkoli-list-card.js brokkoli-list-card.js.gz
+          git add brokkoli-sensor-assignment-card.js brokkoli-sensor-assignment-card.js.gz
           git status
-          git commit -m "Add new build" -a
+          if git diff --cached --quiet; then
+            echo "Build ist identisch zum Commit — nichts zu committen."
+          else
+            git commit -m "Add new build"
+          fi
       - name: "⬆️ Push changes"
         uses: ad-m/github-push-action@master
         with:
@@ -71,7 +76,7 @@ jobs:
 
       - name: "🏷️ Get version tag"
         id: set_var
-        run: echo "COMPONENT_VERSION=$(grep version package.json | cut -d ":" -f 2 | sed -e 's/[^0-9\.beta\-]//g')" >> $GITHUB_ENV
+        run: echo "COMPONENT_VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_ENV
 
       - name: "🏷️ Get git sha"
         id: set_var_2
@@ -118,21 +123,33 @@ jobs:
           stripGeneratorNotice: true
 
       - name: 👍 Create Stable release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           prerelease: false
           body: "${{ steps.changelog.outputs.changelog }}"
           name: "Version ${{ env.COMPONENT_VERSION }}"
           tag_name: "v${{ env.COMPONENT_VERSION }}"
           target_commitish: "${{ env.CURRENT_SHA }}"
+          # HACS laedt bei vorhandenen Release-Assets ausschliesslich diese.
+          # Damit ist exakt festgelegt, was im Frontend landet.
+          files: |
+            brokkoli-card.js
+            brokkoli-area-card.js
+            brokkoli-list-card.js
+            brokkoli-sensor-assignment-card.js
         if: contains(env.COMPONENT_VERSION, 'beta') == false
 
       - name: 🤞 Create Beta release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           prerelease: true
           body: "${{ steps.changelog.outputs.changelog }}"
           name: "Version ${{ env.COMPONENT_VERSION }}"
           tag_name: "v${{ env.COMPONENT_VERSION }}"
           target_commitish: "${{ env.CURRENT_SHA }}"
+          files: |
+            brokkoli-card.js
+            brokkoli-area-card.js
+            brokkoli-list-card.js
+            brokkoli-sensor-assignment-card.js
         if: contains(env.COMPONENT_VERSION, 'beta') == true
