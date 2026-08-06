@@ -1,0 +1,50 @@
+import { LitElement, html, css, CSSResultGroup } from 'lit';
+import { customElement, property, state } from 'lit/decorators.js';
+import { HomeAssistant, fireEvent, LovelaceCardEditor } from 'custom-card-helpers';
+// Type-only-Import vermeidet die zirkuläre Side-Effect-Schleife —
+// brokkoli-sensor-assignment-card importiert dieses Modul oben.
+import type { BrokkoliSensorAssignmentCardConfig } from './brokkoli-sensor-assignment-card';
+
+@customElement('brokkoli-sensor-assignment-card-editor')
+export class BrokkoliSensorAssignmentCardEditor extends LitElement implements LovelaceCardEditor {
+  @property({ attribute: false }) public hass!: HomeAssistant;
+  @state() private _config?: BrokkoliSensorAssignmentCardConfig;
+
+  public setConfig(config: BrokkoliSensorAssignmentCardConfig): void {
+    this._config = config;
+  }
+
+  private get _schema() {
+    return [
+      { name: 'title', selector: { text: {} } },
+    ];
+  }
+
+  protected render() {
+    if (!this.hass || !this._config) return html``;
+    return html`
+      <ha-form
+        .hass=${this.hass}
+        .data=${this._config}
+        .schema=${this._schema}
+        .computeLabel=${this._computeLabel}
+        @value-changed=${this._valueChanged}
+      ></ha-form>
+    `;
+  }
+
+  private _computeLabel = (schema: { name: string }): string => {
+    const labels: Record<string, string> = {
+      title: 'Titel',
+    };
+    return labels[schema.name] ?? schema.name;
+  };
+
+  private _valueChanged(ev: CustomEvent): void {
+    fireEvent(this, 'config-changed', { config: ev.detail.value });
+  }
+
+  static get styles(): CSSResultGroup {
+    return css`ha-form { display: block; }`;
+  }
+}

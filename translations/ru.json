@@ -49,7 +49,7 @@
           "growth_phase": "Фаза Роста",
           "cycle": "Цикл",
           "pot_size": "Размер Горшка",
-          "flowering_duration": "Длительность Цветения",
+          "flowering_duration": "Продолжительность цветения",
           "strain": "Сорт",
           "breeder": "Заводчик",
           "feminized": "Феминизированный",
@@ -100,7 +100,6 @@
           "rooting_duration": "Длительность Укоренения",
           "growth_duration": "Продолжительность роста",
           "flower_duration": "Продолжительность цветения",
-          "flowering_duration": "Продолжительность цветения",
           "harvested_duration": "Длительность Урожая",
           "removed_duration": "Длительность Удаления"
         },
@@ -122,10 +121,10 @@
           "energy_cost": "Стоимость Энергии"
         },
         "growth_phases": {
-          "seed": "Семя",
+          "seeds": "Семя",
           "germination": "Прорастание",
           "rooting": "Укоренение",
-          "growth": "Рост",
+          "growing": "Рост",
           "flowering": "Цветение",
           "harvested": "Собрано",
           "removed": "Удалено"
@@ -217,5 +216,16 @@
         }
       }
     }
+  },
+  "frontend": {
+    "ui": {
+      "legend_rings_mode_active": "Режим: Кольца (нажмите для переключения)",
+      "legend_labels_mode_active": "Режим: Метки (нажмите для переключения)",
+      "legend_heatmap_mode_active": "Режим: Тепловая карта (нажмите для переключения)",
+      "flowering_past": "Цветение прошло",
+      "flowering_to_go": "Цветение осталось",
+      "days": "Дни"
+    },
+    "sensors": {}
   }
-} 
+}

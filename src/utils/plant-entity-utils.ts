@@ -178,4 +178,4 @@ export class PlantEntityUtils {
     static clearPlantSelection(): Set<string> {
         return new Set();
     }
-} 
+}

@@ -100,7 +100,6 @@
           "rooting_duration": "Duración de Enraizamiento",
           "growth_duration": "Duración de Crecimiento",
           "flower_duration": "Duración de Floración",
-          "flowering_duration": "Duración de Floración",
           "harvested_duration": "Duración de Cosecha",
           "removed_duration": "Duración de Eliminación"
         },
@@ -122,10 +121,10 @@
           "energy_cost": "Costo de Energía"
         },
         "growth_phases": {
-          "seed": "Semilla",
+          "seeds": "Semilla",
           "germination": "Germinación",
           "rooting": "Enraizamiento",
-          "growth": "Crecimiento",
+          "growing": "Crecimiento",
           "flowering": "Floración",
           "harvested": "Cosechada",
           "removed": "Eliminada"
@@ -217,5 +216,16 @@
         }
       }
     }
+  },
+  "frontend": {
+    "ui": {
+      "legend_rings_mode_active": "Modo: Anillos (clic para cambiar)",
+      "legend_labels_mode_active": "Modo: Etiquetas (clic para cambiar)",
+      "legend_heatmap_mode_active": "Modo: Mapa de calor (clic para cambiar)",
+      "flowering_past": "Floración pasada",
+      "flowering_to_go": "Floración restante",
+      "days": "Días"
+    },
+    "sensors": {}
   }
-} 
+}

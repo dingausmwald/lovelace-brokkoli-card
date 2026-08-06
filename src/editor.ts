@@ -1,96 +1,185 @@
-import { html } from 'lit';
-import { customElement } from "lit/decorators.js";
-import { DisplayType } from "./types/brokkoli-card-types";
-import { default_show_bars, default_show_elements, default_option_elements, plantAttributes, elementOptions } from "./utils/constants";
-import EditorForm from "@marcokreeft/ha-editor-formbuilder";
-import { FormControlType } from "@marcokreeft/ha-editor-formbuilder/dist/interfaces";
-import { getEntitiesByDomain } from "@marcokreeft/ha-editor-formbuilder/dist/utils/entities";
-import { getEntitiesByDeviceClass } from "@marcokreeft/ha-editor-formbuilder/dist/utils/entities";
-import { EVENT_TYPES } from "./components/history";
+import { LitElement, html, css, CSSResultGroup } from 'lit';
+import { customElement, property, state } from 'lit/decorators.js';
+import { HomeAssistant, fireEvent, LovelaceCardEditor } from 'custom-card-helpers';
+import { BrokkoliCardConfig, DisplayType } from './types/brokkoli-card-types';
+import { default_show_bars, default_show_elements, default_option_elements, initial_expanded_options, plantAttributes, elementOptions } from './utils/constants';
+import { EVENT_TYPES } from './components/history';
 
-// Funktion, um sowohl plant als auch cycle Entitäten zu erhalten
-const getPlantAndCycleEntities = (hass: any) => {
-    const plantEntities = getEntitiesByDomain(hass, 'plant');
-    const cycleEntities = getEntitiesByDomain(hass, 'cycle');
-    return [...plantEntities, ...cycleEntities];
-};
-
-// Definiere die verfügbaren History-Gruppen
-const historyGroupOptions = [
-    { label: 'Wachstumsphasen', value: EVENT_TYPES.PHASE },
-    { label: 'Topfgrößen', value: EVENT_TYPES.POT },
-    { label: 'Standorte', value: EVENT_TYPES.AREA },
-    { label: 'Behandlungen', value: EVENT_TYPES.TREATMENT },
-    { label: 'Bilder', value: EVENT_TYPES.IMAGE },
-    { label: 'Journal', value: EVENT_TYPES.JOURNAL }
-];
-
-// Definiere die Optionen für die Position der History-Linie
-const historyLinePositionOptions = [
-    { label: 'Links', value: 'left' },
-    { label: 'Rechts', value: 'right' }
-];
-
-// Definiere die Optionen für die standardmäßig geöffneten Optionsbereiche
-// Wir filtern die elementOptions, um nur die Optionen zu behalten, die im Optionsmenü angezeigt werden können
-const defaultExpandedOptions = elementOptions.filter(option => 
-    option.value !== 'header' && option.value !== 'options'
+// Optionen ohne header/options (die werden ohnehin nicht aufklappbar im
+// Options-Menü angezeigt) — gilt sowohl für "Option Elements" als auch für
+// "Default Expanded Options".
+const contentElementOptions = elementOptions.filter(
+  opt => opt.value !== 'header' && opt.value !== 'options',
 );
 
+const historyGroupOptions = [
+  { label: 'Wachstumsphasen', value: EVENT_TYPES.PHASE },
+  { label: 'Topfgrößen', value: EVENT_TYPES.POT },
+  { label: 'Standorte', value: EVENT_TYPES.AREA },
+  { label: 'Behandlungen', value: EVENT_TYPES.TREATMENT },
+  { label: 'Bilder', value: EVENT_TYPES.IMAGE },
+  { label: 'Journal', value: EVENT_TYPES.JOURNAL },
+];
+
 @customElement('brokkoli-card-editor')
-export class BrokkoliCardEditor extends EditorForm {
+export class BrokkoliCardEditor extends LitElement implements LovelaceCardEditor {
+  @property({ attribute: false }) public hass!: HomeAssistant;
+  @state() private _config?: BrokkoliCardConfig;
 
-    render() {
-        if (!this._hass || !this._config) {
-            return html``;
-        }
+  public setConfig(config: BrokkoliCardConfig): void {
+    this._config = config;
+  }
 
-        // Stelle sicher, dass wir mit einer Kopie des Konfigurationsobjekts arbeiten
-        if (!this._config.show_bars) {
-            this._config = {
-                ...this._config,
-                show_bars: [...default_show_bars]
-            };
-        }
+  private get _schema() {
+    return [
+      {
+        name: 'entity',
+        required: true,
+        selector: { entity: { filter: [{ domain: 'plant' }, { domain: 'cycle' }] } },
+      },
+      {
+        name: 'display_type',
+        selector: {
+          select: {
+            mode: 'dropdown',
+            options: [
+              { value: DisplayType.Full, label: 'Full' },
+              { value: DisplayType.Compact, label: 'Compact' },
+            ],
+          },
+        },
+      },
+      {
+        name: 'battery_sensor',
+        selector: { entity: { filter: { domain: 'sensor', device_class: 'battery' } } },
+      },
+      {
+        name: 'show_bars',
+        selector: {
+          select: {
+            multiple: true,
+            mode: 'list',
+            options: plantAttributes.map(a => ({ value: a.value, label: a.label })),
+          },
+        },
+      },
+      {
+        name: 'full_width_bars',
+        selector: {
+          select: {
+            multiple: true,
+            mode: 'list',
+            options: plantAttributes.map(a => ({ value: a.value, label: a.label })),
+          },
+        },
+      },
+      {
+        name: 'show_elements',
+        selector: {
+          select: {
+            multiple: true,
+            mode: 'list',
+            options: elementOptions.map(o => ({ value: o.value, label: o.label })),
+          },
+        },
+      },
+      {
+        name: 'option_elements',
+        selector: {
+          select: {
+            multiple: true,
+            mode: 'list',
+            options: contentElementOptions.map(o => ({ value: o.value, label: o.label })),
+          },
+        },
+      },
+      {
+        name: 'default_expanded_options',
+        selector: {
+          select: {
+            multiple: true,
+            mode: 'list',
+            options: contentElementOptions.map(o => ({ value: o.value, label: o.label })),
+          },
+        },
+      },
+      {
+        name: 'history_groups',
+        selector: {
+          select: {
+            multiple: true,
+            mode: 'list',
+            options: historyGroupOptions.map(o => ({ value: o.value, label: o.label })),
+          },
+        },
+      },
+      {
+        name: 'history_line_position',
+        selector: {
+          select: {
+            mode: 'dropdown',
+            options: [
+              { value: 'left', label: 'Links' },
+              { value: 'right', label: 'Rechts' },
+            ],
+          },
+        },
+      },
+      { name: 'listen_to', selector: { text: {} } },
+    ];
+  }
 
-        if (!this._config.show_elements) {
-            this._config = {
-                ...this._config,
-                show_elements: [...default_show_elements]
-            };
-        }
+  private _data(): BrokkoliCardConfig {
+    return {
+      show_bars: [...default_show_bars],
+      show_elements: [...default_show_elements],
+      option_elements: [...default_option_elements],
+      default_expanded_options: [...initial_expanded_options],
+      full_width_bars: [],
+      ...this._config,
+    } as BrokkoliCardConfig;
+  }
 
-        if (!this._config.option_elements) {
-            this._config = {
-                ...this._config,
-                option_elements: [...default_option_elements]
-            };
-        }
+  protected render() {
+    if (!this.hass || !this._config) return html``;
+    return html`
+      <ha-form
+        .hass=${this.hass}
+        .data=${this._data()}
+        .schema=${this._schema}
+        .computeLabel=${this._computeLabel}
+        @value-changed=${this._valueChanged}
+      ></ha-form>
+    `;
+  }
 
-        if (!this._config.full_width_bars) {
-            this._config = {
-                ...this._config,
-                full_width_bars: []
-            };
-        }
+  private _computeLabel = (schema: { name: string }): string => {
+    // ha-form-Standard greift auf hass.localize(...) zu — dort gibt's
+    // keine Übersetzung. Stattdessen mappen wir die wenigen Card-Felder
+    // hier hart.
+    const labels: Record<string, string> = {
+      entity: 'Entity',
+      display_type: 'Display Type',
+      battery_sensor: 'Battery Sensor',
+      show_bars: 'Show Bars',
+      full_width_bars: 'Full Width Bars',
+      show_elements: 'Show Elements',
+      option_elements: 'Option Elements',
+      default_expanded_options: 'Default Expanded Options',
+      history_groups: 'History Groups',
+      history_line_position: 'History Line Position',
+      listen_to: 'Listen-to (List-Card Identifier)',
+    };
+    return labels[schema.name] ?? schema.name;
+  };
 
-        const plantsList = getPlantAndCycleEntities(this._hass);
-        const batteryList = getEntitiesByDeviceClass(this._hass, "sensor", "battery");
+  private _valueChanged(ev: CustomEvent): void {
+    fireEvent(this, 'config-changed', { config: ev.detail.value });
+  }
 
-        return this.renderForm([
-            { controls: [{ label: "Display Type", configValue: "display_type", type: FormControlType.Radio, items: [
-                { label: 'Full', value: DisplayType.Full },
-                { label: 'Compact', value: DisplayType.Compact },
-            ] }] },
-            { controls: [{ label: "Entity", configValue: "entity", type: FormControlType.Dropdown, items: plantsList }] },
-            { controls: [{ label: "Battery Sensor", configValue: "battery_sensor", type: FormControlType.Dropdown, items: batteryList }] },
-            { controls: [{ label: "Show Bars", configValue: "show_bars", type: FormControlType.Checkboxes, items: plantAttributes }] },
-            { controls: [{ label: "Full Width Bars", configValue: "full_width_bars", type: FormControlType.Checkboxes, items: plantAttributes }] },
-            { controls: [{ label: "Show Elements", configValue: "show_elements", type: FormControlType.Checkboxes, items: elementOptions }] },
-            { controls: [{ label: "Option Elements", configValue: "option_elements", type: FormControlType.Checkboxes, items: elementOptions }] },
-            { controls: [{ label: "Default Expanded Options", configValue: "default_expanded_options", type: FormControlType.Checkboxes, items: defaultExpandedOptions }] },
-            { controls: [{ label: "History Groups", configValue: "history_groups", type: FormControlType.Checkboxes, items: historyGroupOptions }] },
-            { controls: [{ label: "History Line Position", configValue: "history_line_position", type: FormControlType.Radio, items: historyLinePositionOptions }] }
-        ]);
-    }    
+  static get styles(): CSSResultGroup {
+    return css`
+      ha-form { display: block; }
+    `;
+  }
 }

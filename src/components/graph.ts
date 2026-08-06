@@ -110,6 +110,26 @@ export function setStartTimestamp(timestamp: number): void {
     window.startTimestamp = timestamp;
 }
 
+// Findet den letzten Index in einem chronologisch sortierten x-Array, dessen
+// Zeitstempel <= target ist. Sensoren wie "health" (sparse, aus der History-API)
+// haben ein anderes/kürzeres x-Array als die auf 50 Buckets normierten Statistik-
+// Serien — ein blind über alle Serien geteilter dataPointIndex würde bei ihnen
+// auf falsche oder nicht-existente Punkte zeigen. "At or before" statt "nearest",
+// damit nie ein zukünftiger Wert vorgezogen angezeigt wird. Gibt -1 zurück wenn
+// target vor dem ersten bekannten Punkt liegt (→ Tooltip zeigt "-").
+function findValueIndexAtOrBefore(xs: number[] | undefined, target: number): number {
+    if (!xs || xs.length === 0 || isNaN(target)) return -1;
+    let idx = -1;
+    for (let i = 0; i < xs.length; i++) {
+        if (xs[i] <= target) {
+            idx = i;
+        } else {
+            break;
+        }
+    }
+    return idx;
+}
+
 export const chartOptions = {
     chart: {
         type: 'rangeArea',
@@ -298,7 +318,9 @@ export const chartOptions = {
         }
     ],
     stroke: {
-        curve: 'smooth',
+        // straight statt smooth: smooth interpoliert über null-Lücken hinweg,
+        // straight zeichnet eine harte Unterbrechung an null-Punkten.
+        curve: 'straight',
         width: Array(20).fill(2),
         dashArray: Array(20).fill(0)
     },
@@ -310,28 +332,32 @@ export const chartOptions = {
         followCursor: false,
         custom: function({ series, dataPointIndex, w }: { series: unknown[][]; seriesIndex: number; dataPointIndex: number; w: { config: { series: { name: string; unit?: string }[]; colors: string[] }; globals: { seriesX: number[][]; seriesRangeStart?: number[][]; seriesRangeEnd?: number[][] } } }) {
             try {
-                const timestamp = w.globals.seriesX[0][dataPointIndex];
-                const date = new Date(timestamp);
-                
+                const timestamp = w.globals.seriesX[0]?.[dataPointIndex];
+                const date = new Date(timestamp ?? NaN);
+                const dateValid = !isNaN(date.getTime());
+
                 let daysSincePlanting = 0;
-                if (window.startTimestamp) {
+                if (dateValid && window.startTimestamp) {
                     const startMs = window.startTimestamp < 1e12 ? window.startTimestamp * 1000 : window.startTimestamp;
                     const startDate = new Date(startMs);
-                    
+
                     if (!isNaN(startDate.getTime())) {
                         const startDateMidnight = new Date(startDate);
                         startDateMidnight.setHours(0, 0, 0, 0);
                         daysSincePlanting = Math.floor((date.getTime() - startDateMidnight.getTime()) / (1000 * 60 * 60 * 24)) + 1;
                     }
                 }
-                
-                const dateStr = new Intl.DateTimeFormat(undefined, {
-                    day: '2-digit',
-                    month: 'short',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                }).format(date);
-                
+
+                // dateStr nur formatieren wenn Date gültig — sonst wirft Intl.DateTimeFormat.format RangeError
+                const dateStr = dateValid
+                    ? new Intl.DateTimeFormat(undefined, {
+                        day: '2-digit',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                    }).format(date)
+                    : '';
+
                 const dateHeader = daysSincePlanting > 0 ? `<strong>Tag ${daysSincePlanting}</strong> - ${dateStr}` : dateStr;
 
                 // Sensoren und Werte aus dem Chart holen
@@ -348,11 +374,17 @@ export const chartOptions = {
 
                 // Erzeuge HTML für jeden Sensor
                 const sensorRows = sensors.map((sensor: TooltipSensor) => {
-                    const range = w.globals.seriesRangeStart?.[sensor.index]?.[dataPointIndex] !== undefined ? {
-                        min: w.globals.seriesRangeStart[sensor.index][dataPointIndex],
-                        max: w.globals.seriesRangeEnd[sensor.index][dataPointIndex]
-                    } : undefined;
-                    const mean = series[sensor.index + 1]?.[dataPointIndex] as number;
+                    // Eigener Index pro Sensor statt geteiltem dataPointIndex — Serien mit
+                    // abweichendem x-Array (z.B. "health", sparse aus der History-API)
+                    // würden sonst auf falsche/fehlende Punkte zeigen (siehe findValueIndexAtOrBefore).
+                    const sensorXs = w.globals.seriesX[sensor.index + 1];
+                    const idx = findValueIndexAtOrBefore(sensorXs, timestamp);
+
+                    const rawMin = idx === -1 ? undefined : w.globals.seriesRangeStart?.[sensor.index]?.[idx];
+                    const rawMax = idx === -1 ? undefined : w.globals.seriesRangeEnd?.[sensor.index]?.[idx];
+                    // null/undefined uniform behandeln (sonst Number(null).toFixed(0)="0" → "0 - 0" in Daten-Lücken)
+                    const range = (rawMin == null || rawMax == null) ? undefined : { min: rawMin, max: rawMax };
+                    const mean = idx === -1 ? undefined : (series[sensor.index + 1]?.[idx] as number);
 
                     // Formatiere die Werte
                     const formatRange = () => {
@@ -429,6 +461,7 @@ export class FlowerGraph extends LitElement {
     private _prevMoistureRangeData: unknown = null;
     private _prevMoistureMeanData: unknown = null;
     private _isConnected = false;
+    private _initialized = false;
     private _plantInfo: PlantInfo | null = null;
     private _sensorTypes = [
         { id: 'temperature', scale: 1, yaxis: 0, color: '#2E93fA' },
@@ -437,7 +470,7 @@ export class FlowerGraph extends LitElement {
         { id: 'health', scale: 6, yaxis: 0, color: '#FF4560', apiPath: 'helpers.health' },
         { id: 'water_consumption', scale: 1, yaxis: 0, color: '#775DD0' },
         { id: 'fertilizer_consumption', scale: 0.01, yaxis: 0, color: '#00D2FF' },
-        { id: 'power_consumption', scale: 1, yaxis: 0, color: '#FEB019' },
+        { id: 'power_consumption', scale: 0.01, yaxis: 0, color: '#FEB019' },
         { id: 'soil_moisture', scale: 1, yaxis: 1, color: '#00E396', apiPath: 'moisture' },
         { id: 'illuminance', scale: 0.01, yaxis: 1, color: '#CED4DC' },
         { id: 'humidity', scale: 1, yaxis: 1, color: '#008FFB' }
@@ -452,6 +485,16 @@ export class FlowerGraph extends LitElement {
             // Die eigentliche Initialisierung erfolgt in firstUpdated
             await this._loadScripts();
             await this._loadFlatpickr();
+
+            // Wenn die Komponente bereits einmal initialisiert war (firstUpdated()
+            // feuert nur einmal pro Instanz), aber Chart/Picker in disconnectedCallback
+            // zerstört wurden (z.B. HA-Dashboard-Tab-Wechsel: derselbe Custom-Element-
+            // Knoten wird disconnected statt neu erzeugt), hier neu aufbauen — sonst
+            // bleibt der Graph nach dem Zurückwechseln dauerhaft leer.
+            if (this._initialized && !this._chart) {
+                this._initDatePicker();
+                this._initChart();
+            }
         }
     }
 
@@ -493,9 +536,11 @@ export class FlowerGraph extends LitElement {
         
         // Erst nach Laden aller Daten initialisieren wir den Chart
         this._initChart();
-        
+
         // Fordern wir ein explizites Neurendern des Components an
         this.requestUpdate();
+
+        this._initialized = true;
     }
 
     private _updateSensorsFromPlantInfo() {
@@ -551,15 +596,27 @@ export class FlowerGraph extends LitElement {
         
         // Hole die Phasen-Events wie in der Timeline
         const plantName = this.entityId.split('.')[1];
-        const phaseEntity = this.hass.states[`select.${plantName}_growth_phase`];
+        const phaseEntityId = (this._plantInfo as { helpers?: { growth_phase?: { entity_id?: string } } } | null)?.helpers?.growth_phase?.entity_id;
+        const phaseEntity = phaseEntityId ? this.hass.states[phaseEntityId] : undefined;
         
         if (phaseEntity?.attributes) {
-            const phases = ['samen', 'keimen', 'wurzeln', 'wachstum', 'blüte', 'entfernt', 'geerntet'];
+            // Die Integration speichert Date-Attribute mit englischen Phase-Keys
+            // (siehe select.py date_mapping): seeds_start, germination_start,
+            // rooting_start, growing_start, flowering_start, removed_date,
+            // harvested_date. Der Graph muss die exakt so suchen.
+            const phaseAttrs = [
+                'seeds_start',
+                'germination_start',
+                'rooting_start',
+                'growing_start',
+                'flowering_start',
+                'removed_date',
+                'harvested_date',
+            ];
             const dates: Date[] = [];
-            
-            // Sammle alle Phasen-Events
-            for (const phase of phases) {
-                const startDate = phaseEntity.attributes[`${phase === 'entfernt' || phase === 'geerntet' ? phase : phase + '_beginn'}`];
+
+            for (const attr of phaseAttrs) {
+                const startDate = phaseEntity.attributes[attr];
                 if (startDate) {
                     const date = new Date(startDate);
                     if (!isNaN(date.getTime())) {
@@ -655,12 +712,13 @@ export class FlowerGraph extends LitElement {
             const oldHass = changedProps.get('hass') as HomeAssistant | undefined;
             if (!oldHass) return;
 
-            const plantName = this.entityId.split('.')[1];
-            const sensorId = `sensor.${plantName}_temperature`;
-            
+            // Sensor-entity_id aus plant/get_info statt hartkodiertem Pattern.
+            const sensorId = (this._plantInfo as { temperature?: { sensor?: string } } | null)?.temperature?.sensor;
+            if (!sensorId) return;
+
             const oldState = oldHass.states[sensorId];
             const newState = this.hass.states[sensorId];
-            
+
             if (oldState?.state !== newState?.state) {
                 this.updateGraphData();
             }
@@ -734,7 +792,8 @@ export class FlowerGraph extends LitElement {
         const regularSensors = this._sensors.filter(s => !s.entityId.startsWith('number.') && !s.entityId.startsWith('input_number.'));
         const helperSensors = this._sensors.filter(s => s.entityId.startsWith('number.') || s.entityId.startsWith('input_number.'));
         
-        // Bestimme den zu verwendenden Zeitraum-Typ
+        // 5-Min-Stats sind in HA nur ~10 Tage retainiert, Hour-Stats für immer.
+        // Bei Range > 2 Tage hourly, sonst fehlen die ältesten Tage komplett.
         let periodType = 'hour';
         if (daysDiff <= 2) {
             periodType = '5minute';
@@ -827,24 +886,46 @@ export class FlowerGraph extends LitElement {
             let meanData: { x: number, y: number }[] = [];
 
             if (sensorData[entityId] && sensorData[entityId].length > 0) {
-                const stats = sensorData[entityId].filter(item => item.mean !== null);
-                
-                // Skaliere die Werte basierend auf dem Sensor-Typ
+                // Nulls werden NICHT gestrippt — sonst connectet ApexCharts über
+                // Daten-Lücken (z.B. VM-off-Phase) hinweg. Stattdessen auf y=null
+                // mappen → ApexCharts zeichnet sauber eine Lücke.
+                const stats = sensorData[entityId];
                 const scale = this._getScale(sensor.id);
-                
+                const nullish = (v: unknown) => v === null || v === undefined;
+
                 if (stats.length > 50) {
                     const grouped = this._groupGraphData(stats, scale);
                     rangeData = grouped.rangeData;
                     meanData = grouped.meanData;
                 } else {
-                    rangeData = stats.map(item => ({
+                    const sorted = stats.slice().sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+                    rangeData = sorted.map(item => ({
                         x: new Date(item.start).getTime(),
-                        y: [item.min * scale, item.max * scale]
+                        y: (nullish(item.min) || nullish(item.max))
+                            ? [null, null] as unknown as [number, number]
+                            : [item.min * scale, item.max * scale]
                     }));
-                    meanData = stats.map(item => ({
+                    meanData = sorted.map(item => ({
                         x: new Date(item.start).getTime(),
-                        y: item.mean * scale
+                        y: nullish(item.mean) ? (null as unknown as number) : item.mean * scale
                     }));
+                }
+
+                if (sensor.id === 'health') {
+                    // Health ist ein manuell gesetzter Wert (number-Helper), der über
+                    // die History-API kommt und nur bei tatsächlicher Änderung einen
+                    // Datenpunkt liefert — lange Lücken zwischen Bewertungen sind normal,
+                    // kein Sensor-Ausfall. Gap-Detection würde die Linie hier fälschlich
+                    // fragmentieren, daher stattdessen den letzten Wert fortschreiben.
+                    rangeData = this._forwardFill(rangeData);
+                    meanData = this._forwardFill(meanData);
+                } else {
+                    // Gap-Detection greift auf beiden Pfaden: wo zwei
+                    // aufeinanderfolgende Punkte > 1.4x den Median-Abstand
+                    // auseinanderliegen, Null-Marker einfügen → ApexCharts
+                    // zeichnet sichtbare Lücke statt durchgehender Linie.
+                    rangeData = this._insertGapMarkers(rangeData, true);
+                    meanData = this._insertGapMarkers(meanData, false);
                 }
             }
 
@@ -888,11 +969,32 @@ export class FlowerGraph extends LitElement {
         if (stats.length === 0) {
             return { rangeData: [], meanData: [] };
         }
-        
+
         // Sortiere die Statistik-Daten anhand des Start-Zeitpunkts
         const sorted = stats.slice().sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
-        const firstTime = new Date(sorted[0].start).getTime();
-        const lastTime = new Date(sorted[sorted.length - 1].start).getTime();
+        const sortedTimes = sorted.map(s => new Date(s.start).getTime());
+
+        // Erkenne Lücken in den ROH-Daten (vor Bucketing). Buckets die innerhalb
+        // einer Lücke liegen werden später als null emittiert, auch wenn benachbarte
+        // Buckets noch Daten haben — sonst verschluckt das 50-Bucket-Compaction
+        // kurze VM-off-Phasen.
+        const rawGaps: { from: number; to: number }[] = [];
+        if (sortedTimes.length >= 3) {
+            const intervals: number[] = [];
+            for (let i = 1; i < sortedTimes.length; i++) intervals.push(sortedTimes[i] - sortedTimes[i-1]);
+            intervals.sort((a, b) => a - b);
+            const median = intervals[Math.floor(intervals.length / 2)];
+            // Lücke = > 3x Median UND > 10 Minuten (sonst flackert's bei normalem Jitter)
+            const gapThreshold = Math.max(median * 3, 10 * 60 * 1000);
+            for (let i = 1; i < sortedTimes.length; i++) {
+                if (sortedTimes[i] - sortedTimes[i-1] > gapThreshold) {
+                    rawGaps.push({ from: sortedTimes[i-1], to: sortedTimes[i] });
+                }
+            }
+        }
+
+        const firstTime = sortedTimes[0];
+        const lastTime = sortedTimes[sortedTimes.length - 1];
         const range = lastTime - firstTime;
         const desiredBuckets = 50;
         const bucketDuration = range / desiredBuckets;
@@ -903,7 +1005,7 @@ export class FlowerGraph extends LitElement {
             buckets.push({ xValues: [], min: Infinity, max: -Infinity, sum: 0, count: 0 });
         }
 
-        // Ordne jeden Datenpunkt einem Bucket zu
+        // Ordne jeden Datenpunkt einem Bucket zu (nulls ausklammern, NICHT die Bucket-Position)
         sorted.forEach(stat => {
             const time = new Date(stat.start).getTime();
             let index = Math.floor((time - firstTime) / bucketDuration);
@@ -912,24 +1014,76 @@ export class FlowerGraph extends LitElement {
             }
             const bucket = buckets[index];
             bucket.xValues.push(time);
-            bucket.min = Math.min(bucket.min, stat.min * scale);
-            bucket.max = Math.max(bucket.max, stat.max * scale);
-            bucket.sum += stat.mean * scale;
-            bucket.count++;
+            if (stat.min !== null && stat.min !== undefined) bucket.min = Math.min(bucket.min, stat.min * scale);
+            if (stat.max !== null && stat.max !== undefined) bucket.max = Math.max(bucket.max, stat.max * scale);
+            if (stat.mean !== null && stat.mean !== undefined) { bucket.sum += stat.mean * scale; bucket.count++; }
         });
 
-        // Erzeuge aggregierte Daten für Range- und Mean-Serie
+        // Aggregierte Serien: leere Buckets → null-Y, damit Gaps sichtbar bleiben.
+        // Zusätzlich Buckets die innerhalb einer ROH-Lücke liegen explizit als null
+        // markieren — auch wenn sie zufällig noch Daten am Rand haben.
         const rangeData: { x: number, y: [number, number] }[] = [];
         const meanData: { x: number, y: number }[] = [];
-        buckets.forEach(bucket => {
-            if (bucket.count > 0) {
-                const avgTime = bucket.xValues.reduce((a, b) => a + b, 0) / bucket.count;
-                rangeData.push({ x: avgTime, y: [bucket.min, bucket.max] });
-                meanData.push({ x: avgTime, y: bucket.sum / bucket.count });
-            }
+        buckets.forEach((bucket, i) => {
+            const bucketStart = firstTime + i * bucketDuration;
+            const bucketEnd = firstTime + (i + 1) * bucketDuration;
+            const avgTime = bucket.xValues.length > 0
+                ? bucket.xValues.reduce((a, b) => a + b, 0) / bucket.xValues.length
+                : firstTime + (i + 0.5) * bucketDuration;
+            // Liegt der Bucket-Mittelpunkt innerhalb einer Roh-Lücke?
+            const inRawGap = rawGaps.some(g => avgTime > g.from && avgTime < g.to);
+            const hasRange = !inRawGap && bucket.min !== Infinity && bucket.max !== -Infinity;
+            const hasMean = !inRawGap && bucket.count > 0;
+            rangeData.push({ x: avgTime, y: hasRange ? [bucket.min, bucket.max] : [null, null] as unknown as [number, number] });
+            meanData.push({ x: avgTime, y: hasMean ? bucket.sum / bucket.count : (null as unknown as number) });
         });
 
         return { rangeData, meanData };
+    }
+
+    // Fügt Null-Punkte zwischen Datenpunkten ein deren X-Abstand
+    // > 1.4x Median-Abstand ist. Wird auf beiden Pfaden (bucketed + direkt)
+    // angewendet, damit auch dichte Reihen (Temperatur) Lücken zeigen wenn
+    // zwei Bucket-AvgTimes auseinanderdriften.
+    private _insertGapMarkers<T extends { x: number; y: number | number[] | null }>(data: T[], isRange: boolean): T[] {
+        if (data.length < 3) return data;
+        const intervals: number[] = [];
+        for (let i = 1; i < data.length; i++) intervals.push(data[i].x - data[i-1].x);
+        const sortedIntervals = intervals.slice().sort((a, b) => a - b);
+        const median = sortedIntervals[Math.floor(sortedIntervals.length / 2)];
+        const threshold = median * 1.4;
+        const nullY = isRange ? ([null, null] as unknown as number[]) : (null as unknown as number);
+        const result: T[] = [];
+        for (let i = 0; i < data.length; i++) {
+            result.push(data[i]);
+            if (i < data.length - 1) {
+                const gap = data[i+1].x - data[i].x;
+                if (gap > threshold) {
+                    const midX = data[i].x + gap / 2;
+                    result.push({ x: midX, y: nullY } as T);
+                }
+            }
+        }
+        return result;
+    }
+
+    // Schreibt den letzten bekannten (nicht-null) Wert über Null-Punkte hinweg fort,
+    // statt dort eine Lücke zu lassen. Für Werte, die sich nur bei tatsächlicher
+    // Änderung aktualisieren (z.B. health), damit die Linie durchgehend bleibt statt
+    // in Fragmente zu zerfallen. Führende Nulls (vor dem ersten echten Wert) bleiben
+    // unangetastet — dort gab es noch keine Bewertung.
+    private _forwardFill<T extends { x: number; y: number | number[] | null }>(data: T[]): T[] {
+        let last: T['y'] | null = null;
+        return data.map(point => {
+            const isNullish = point.y === null
+                || point.y === undefined
+                || (Array.isArray(point.y) && (point.y[0] === null || point.y[0] === undefined));
+            if (isNullish) {
+                return last === null ? point : { ...point, y: last };
+            }
+            last = point.y;
+            return point;
+        });
     }
 
     private _getScale(sensorId: string): number {
@@ -941,7 +1095,7 @@ export class FlowerGraph extends LitElement {
             health: 1,          // 0-5
             water_consumption: 1,// ml
             fertilizer_consumption: 0.01, // 0-3000
-            power_consumption: 1,// W
+            power_consumption: 0.01,// W (0-3500 range on the shared 0-35 left axis)
             soil_moisture: 1,   // 0-100%
             illuminance: 0.01,     // 0-10000
             humidity: 1         // 0-100%
@@ -984,13 +1138,14 @@ export class FlowerGraph extends LitElement {
         // Hole das Startdatum aus der ersten Phase
         const plantName = this.entityId?.split('.')[1];
         if (plantName && this.hass) {
-            const phaseEntity = this.hass.states[`select.${plantName}_growth_phase`];
+            const phaseEntityId = (this._plantInfo as { helpers?: { growth_phase?: { entity_id?: string } } } | null)?.helpers?.growth_phase?.entity_id;
+        const phaseEntity = phaseEntityId ? this.hass.states[phaseEntityId] : undefined;
             if (phaseEntity?.attributes) {
-                const phases = ['samen', 'keimen', 'wurzeln', 'wachstum', 'blüte', 'entfernt', 'geerntet'];
+                const phases = ['seeds', 'germination', 'rooting', 'growing', 'flowering', 'removed', 'harvested'];
                 const dates: Date[] = [];
                 
                 for (const phase of phases) {
-                    const startDateStr = phaseEntity.attributes[`${phase === 'entfernt' || phase === 'geerntet' ? phase : phase + '_beginn'}`];
+                    const startDateStr = phaseEntity.attributes[`${phase === 'removed' || phase === 'harvested' ? phase : phase + '_start'}`];
                     if (startDateStr) {
                         const date = new Date(startDateStr);
                         if (!isNaN(date.getTime())) {
@@ -1099,14 +1254,15 @@ export class FlowerGraph extends LitElement {
 
                         try {
                             const plantName = this.entityId.split('.')[1];
-                            const phaseEntity = this.hass.states[`select.${plantName}_growth_phase`];
+                            const phaseEntityId = (this._plantInfo as { helpers?: { growth_phase?: { entity_id?: string } } } | null)?.helpers?.growth_phase?.entity_id;
+                            const phaseEntity = phaseEntityId ? this.hass?.states[phaseEntityId] : undefined;
                             if (!phaseEntity?.attributes) return;
 
-                            const phases = ['samen', 'keimen', 'wurzeln', 'wachstum', 'blüte', 'entfernt', 'geerntet'];
+                            const phases = ['seeds', 'germination', 'rooting', 'growing', 'flowering', 'removed', 'harvested'];
                             const dates: Date[] = [];
                             
                             for (const phase of phases) {
-                                const startDate = phaseEntity.attributes[`${phase === 'entfernt' || phase === 'geerntet' ? phase : phase + '_beginn'}`];
+                                const startDate = phaseEntity.attributes[`${phase === 'removed' || phase === 'harvested' ? phase : phase + '_start'}`];
                                 if (startDate) {
                                     const date = new Date(startDate);
                                     if (!isNaN(date.getTime())) {

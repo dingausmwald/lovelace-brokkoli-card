@@ -120,6 +120,10 @@ export class BrokkoliArea extends LitElement {
   // Timer für die verzögerte Datenaktualisierung
   private _updateTimeout: number = 0;
 
+  // ResizeObserver erkennt sowohl Resize als auch Visibility-Changes
+  // (z.B. Tab-Switch). window-resize verfehlt letzteren Fall.
+  private _resizeObserver?: ResizeObserver;
+
   // Bound event handlers to ensure proper reference
   private _boundHandleDrag = this._handleDrag.bind(this);
   private _boundEndDrag = this._endDrag.bind(this);
@@ -136,18 +140,12 @@ export class BrokkoliArea extends LitElement {
     // Größe der Zellen berechnen
     this._calculateCellSize();
     
-    // Auf Größenänderungen reagieren
+    // Auf Größenänderungen reagieren — Window-Resize + ResizeObserver,
+    // damit auch Visibility-Changes (Tab-Switch, kollabierte Sections)
+    // einen recalc auslösen.
     window.addEventListener('resize', this._handleResize);
-    
-    // Setze einen Timeout, um sicherzustellen, dass die Komponente korrekt gerendert wird
-    setTimeout(() => {
-      const newRect = this.getBoundingClientRect();
-      if (newRect.width !== rect.width || newRect.height !== rect.height) {
-        this._containerSize = { width: newRect.width, height: newRect.height };
-        this._calculateCellSize();
-        this.requestUpdate();
-      }
-    }, 100);
+    this._resizeObserver = new ResizeObserver(() => this._handleResize());
+    this._resizeObserver.observe(this);
 
     // Globalen Klick-Listener hinzufügen, um Auswahl zurückzusetzen, wenn außerhalb geklickt wird
     window.addEventListener('click', this._handleGlobalClick);
@@ -200,6 +198,8 @@ export class BrokkoliArea extends LitElement {
     // Event-Listener entfernen
     window.removeEventListener('resize', this._handleResize);
     window.removeEventListener('click', this._handleGlobalClick);
+    this._resizeObserver?.disconnect();
+    this._resizeObserver = undefined;
     
     // Event-Listener für neu erstellte Pflanzen entfernen
     this.removeEventListener('plant-created', this._handlePlantCreated);
@@ -211,6 +211,27 @@ export class BrokkoliArea extends LitElement {
     }
   }
   
+  // Findet den Location-Text-Helper einer Plant über das gemeinsame
+  // config_entry_id. Vermeidet das Erraten der Helper-Entity-ID aus
+  // dem Plant-Slug — das ist fehleranfällig bei Strain-Namen mit
+  // Ziffern (z.B. "AK-47" → "ak_47").
+  private _findLocationEntity(plantEntityId: string) {
+    if (!this.hass) return null;
+    const plantEntity = this.hass.entities?.[plantEntityId];
+    const deviceId = plantEntity?.device_id;
+    if (!deviceId) return null;
+    for (const e of Object.values(this.hass.entities ?? {})) {
+      if (
+        e.device_id === deviceId
+        && e.entity_id.startsWith('text.')
+        && e.entity_id.endsWith('_location')
+      ) {
+        return this.hass.states[e.entity_id] ?? null;
+      }
+    }
+    return null;
+  }
+
   // Lädt die Positionen aus den Entitäten
   private _loadPositions() {
     if (!this.hass) return;
@@ -221,20 +242,11 @@ export class BrokkoliArea extends LitElement {
     const undefinedPositionEntities: string[] = [];
     
     this.entities.forEach(entityId => {
-      // Extrahiere den Namen der Pflanze aus der Entity-ID
-      const plantId = entityId.split('.')[1];
-      
-      // Konstruiere die ID des Location-Helper, der dem Muster text.name_location_X folgt
-      // wobei X optional ist und der Zahl am Ende der Pflanzen-ID entspricht
-      const match = plantId.match(/(.+?)(_\d+)?$/);
-      const baseName = match ? match[1] : plantId;
-      const suffix = match && match[2] ? match[2] : '';
-      
-      const locationEntityId = `text.${baseName}_location${suffix}`;
-      
-      // Hole den Location-Helper
-      const locationEntity = this.hass!.states[locationEntityId];
-      
+      // Plant-Entity und Location-Helper teilen sich die config_entry_id;
+      // der Helper hat zudem unique_id `{entry_id}-location`. Damit lookup'en
+      // wir den richtigen Helper ohne Bastelei am Entity-Slug.
+      const locationEntity = this._findLocationEntity(entityId);
+
       let hasDefinedPosition = false;
       
       if (locationEntity && locationEntity.state && locationEntity.state !== 'unknown') {
@@ -787,7 +799,9 @@ export class BrokkoliArea extends LitElement {
     // Berechne Radius exakt - ohne Abstände
     // Abhängig von der Position (0 = äußerster Ring, 1 = zweiter Ring, usw.)
     // und der Gesamtzahl der Ringe
-    const radius = (this._cellSize / 2) - (strokeWidth / 2) - (position * strokeWidth);
+    // Math.max(0, …) verhindert SVG-Errors falls _cellSize transient 0 ist
+    // (z.B. wenn Container noch keine messbare Höhe hat — getBoundingClientRect=0).
+    const radius = Math.max(0, (this._cellSize / 2) - (strokeWidth / 2) - (position * strokeWidth));
     
     // Berechne Kreisparameter
     const circumference = 2 * Math.PI * radius;
@@ -848,7 +862,9 @@ export class BrokkoliArea extends LitElement {
     const strokeWidth = 4;
     
     // Berechne Radius exakt - ohne Abstände
-    const radius = (this._cellSize / 2) - (strokeWidth / 2) - (position * strokeWidth);
+    // Math.max(0, …) verhindert SVG-Errors falls _cellSize transient 0 ist
+    // (z.B. wenn Container noch keine messbare Höhe hat — getBoundingClientRect=0).
+    const radius = Math.max(0, (this._cellSize / 2) - (strokeWidth / 2) - (position * strokeWidth));
     
     return html`
       <svg class="sensor-ring" viewBox="0 0 ${this._cellSize} ${this._cellSize}">

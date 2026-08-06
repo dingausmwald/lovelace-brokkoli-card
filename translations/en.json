@@ -41,7 +41,13 @@
       "no_matching_sensors": "No matching sensors found",
       "other_images": "Other Images",
       "back_to_main_images": "Back to Main Images",
-      "main_images": "Main Images"
+      "main_images": "Main Images",
+      "legend_rings_mode_active": "Mode: Rings (click to switch)",
+      "legend_labels_mode_active": "Mode: Labels (click to switch)",
+      "legend_heatmap_mode_active": "Mode: Heatmap (click to switch)",
+      "flowering_past": "Flowering past",
+      "flowering_to_go": "Flowering remaining",
+      "days": "Days"
     },
     "fields": {
       "friendly_name": "Name",
@@ -102,8 +108,8 @@
       "growth_duration": "Growth Duration",
       "flower_duration": "Flower Duration",
       "harvested_duration": "Harvested Duration",
-            "removed_duration": "Removed Duration"
-      },
+      "removed_duration": "Removed Duration"
+    },
     "sensors": {
       "temperature": "Temperature",
       "soil_moisture": "Soil Moisture",
@@ -116,16 +122,22 @@
       "water_consumption": "Water Consumption",
       "fertilizer_consumption": "Fertilizer Consumption",
       "power_consumption": "Power Consumption",
+      "total_water_consumption": "Total Water Consumption",
+      "total_fertilizer_consumption": "Total Fertilizer Consumption",
+      "total_power_consumption": "Total Power Consumption",
       "ph": "pH Value",
       "health": "Health",
+      "ppfd_mol": "PPFD",
       "total_ppfd": "Total PPFD",
+      "total_ppfd_mol_integral": "Total PPFD",
+      "total_integral": "Total Integral",
       "energy_cost": "Energy Cost"
     },
     "growth_phases": {
-      "seed": "Seed",
+      "seeds": "Seed",
       "germination": "Germination",
       "rooting": "Rooting",
-      "growth": "Growth",
+      "growing": "Growth",
       "flowering": "Flowering",
       "harvested": "Harvested",
       "removed": "Removed"
@@ -185,25 +197,6 @@
       "filter_range_to": "to",
       "add_plant": "Add New Plant"
     },
-    "graph": {
-      "temperature": "Temperature",
-      "conductivity": "Conductivity",
-      "dli": "DLI",
-      "health": "Health",
-      "water_consumption": "Water Consumption",
-      "fertilizer_consumption": "Fertilizer Consumption",
-      "power_consumption": "Power Consumption"
-    },
-    "diagnostics": {
-      "energy_cost": "Energy Cost",
-      "total_power_consumption": "Total Power Consumption",
-      "total_integral": "Total Integral",
-      "total_water_consumption": "Total Water Consumption",
-      "total_fertilizer_consumption": "Total Fertilizer Consumption",
-      "power_consumption": "Power Consumption",
-      "ppfd_mol": "PPFD",
-      "total_ppfd_mol_integral": "Total PPFD"
-    },
     "helpers": {
       "growth_phase": "Growth Phase",
       "flowering_duration": "Flowering Duration",
@@ -216,4 +209,4 @@
       "cycle": "Cycle"
     }
   }
-} 
+}

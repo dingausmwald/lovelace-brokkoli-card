@@ -3,6 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { HomeAssistant, LovelaceCardEditor } from 'custom-card-helpers';
 import { positionStyles } from './styles/area-styles';
 import './components/brokkoli-area';
+import './area-editor';
 import { PlantEntityUtils } from './utils/plant-entity-utils';
 import { FilterUtils } from './utils/filter-utils';
 import { TranslationUtils } from './utils/translation-utils';

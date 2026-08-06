@@ -128,12 +128,12 @@ export class FlowerHistory extends LitElement {
         if (!phaseEntity?.attributes) return null;
         
         // Sammle alle Phasen-Daten
-        const phases = ['samen', 'keimen', 'wurzeln', 'wachstum', 'blüte', 'entfernt', 'geerntet'] as const;
+        const phases = ['seeds', 'germination', 'rooting', 'growing', 'flowering', 'removed', 'harvested'] as const;
         const dates: Date[] = [];
         
         // Sammle alle vorhandenen Phasendaten
         for (const phase of phases) {
-            const startDate = phaseEntity.attributes[`${phase === 'entfernt' || phase === 'geerntet' ? phase : phase + '_beginn'}`];
+            const startDate = phaseEntity.attributes[`${phase === 'removed' || phase === 'harvested' ? phase : phase + '_start'}`];
             if (startDate) {
                 const date = new Date(startDate);
                 if (!isNaN(date.getTime())) {
@@ -177,14 +177,14 @@ export class FlowerHistory extends LitElement {
             const phaseEntity = this.hass.states[phaseEntityId];
 
             if (phaseEntity) {
-                const phases = ['samen', 'keimen', 'wurzeln', 'wachstum', 'blüte', 'entfernt', 'geerntet'] as const;
+                const phases = ['seeds', 'germination', 'rooting', 'growing', 'flowering', 'removed', 'harvested'] as const;
                 // Verwende TranslationUtils für die Phasen-Labels
                 
                 // Sammle alle Phasen-Events
                 const phaseEvents: TimelineEvent[] = [];
                 
                 for (const phase of phases) {
-                    const startDate = phaseEntity?.attributes[`${phase === 'entfernt' || phase === 'geerntet' ? phase : phase + '_beginn'}`];
+                    const startDate = phaseEntity?.attributes[`${phase === 'removed' || phase === 'harvested' ? phase : phase + '_start'}`];
                     if (startDate) {
                         const event: TimelineEvent = {
                             date: new Date(startDate),
@@ -194,13 +194,13 @@ export class FlowerHistory extends LitElement {
                         };
                         
                         // Setze Farben für die Events
-                        if (phase === 'entfernt') {
+                        if (phase === 'removed') {
                             event.style = 'display: none;'; // Unsichtbar
-                        } else if (phase === 'geerntet') {
+                        } else if (phase === 'harvested') {
                             event.style = `background-color: hsl(${COLOR_CONFIG.growth.hue}, 70%, 45%);`;
                         } else {
                             // Berechne die Position der Phase im Wachstumszyklus (ohne entfernt/geerntet)
-                            const growthPhases = phases.filter(p => p !== 'entfernt' && p !== 'geerntet');
+                            const growthPhases = phases.filter(p => p !== 'removed' && p !== 'harvested');
                             const phaseIndex = growthPhases.indexOf(phase);
                             const lightness = growthPhases.length === 1 ? 55 : 
                                 55 - ((phaseIndex / Math.max(1, growthPhases.length - 1)) * 25); // Hell nach dunkel (55% bis 30%)
@@ -608,7 +608,7 @@ export class FlowerHistory extends LitElement {
                     });
                     
                     // Datum der Phase setzen (aktuelles Datum)
-                    const phaseAttribute = this._newEntryValue === 'entfernt' || this._newEntryValue === 'geerntet' 
+                    const phaseAttribute = this._newEntryValue === 'removed' || this._newEntryValue === 'harvested' 
                         ? this._newEntryValue 
                         : `${this._newEntryValue}_beginn`;
                     
@@ -1088,7 +1088,7 @@ export class FlowerHistory extends LitElement {
                         bgColor = `--milestone-color: hsla(${COLOR_CONFIG.growth.hue}, ${COLOR_CONFIG.growth.saturation}%, 45%, 0.15)`;
                     }
                     
-                    // Extrahiere die Phase aus dem Event-Typ (z.B. 'phase-samen' -> 'samen')
+                    // Extrahiere die Phase aus dem Event-Typ (z.B. 'phase-samen' -> 'seeds')
                     const phase = event.type.split('-')[1];
                     
                     // Verwende die zentrale Icon-Definition mit index-basierter Logik

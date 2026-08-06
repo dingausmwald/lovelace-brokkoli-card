@@ -6,9 +6,11 @@ export const style = css`
      * =================================== */
     .consumption-data {
         display: grid;
-        grid-template-columns: 1fr 1fr 2fr;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+        grid-auto-rows: 1fr;
         gap: 4px;
-        margin: 8px 0;
+        width: 90%;
+        margin: 8px auto;
     }
 
     /* ===================================
@@ -18,18 +20,20 @@ export const style = css`
         display: flex;
         align-items: center;
         gap: 8px;
-        padding: 4px;
+        padding: 8px 16px;
         border-radius: 4px;
         background: var(--card-background-color, var(--ha-card-background));
         cursor: pointer;
         transition: background-color 0.3s ease;
+        min-width: 0;
+        box-sizing: border-box;
     }
 
     .consumption-item:hover {
         background: var(--primary-background-color);
     }
 
-    /* Large Item (Energiekosten) */
+    /* Large Item (Energiekosten) — spans column 3 across both rows */
     .consumption-item.large {
         grid-column: 3;
         grid-row: 1 / 3;
@@ -66,6 +70,7 @@ export const style = css`
         display: flex;
         flex-direction: column;
         gap: 2px;
+        min-width: 0;
     }
 
     /* Large Details (Energiekosten) */

@@ -1,11 +1,14 @@
-import { DropdownOption } from "@marcokreeft/ha-editor-formbuilder/dist/interfaces";
 import { HomeAssistant } from "custom-card-helpers";
+
+// Lokaler Editor-Options-Type (ersetzt DropdownOption aus dem entfernten
+// @marcokreeft/ha-editor-formbuilder).
+interface DropdownOption { label: string; value: string; }
 
 export const CARD_NAME = "brokkoli-card";
 export const CARD_EDITOR_NAME = "brokkoli-card-editor";
 
-// Central phase constants - should match field-definitions.ts
-export const PHASES = ['seed', 'germination', 'rooting', 'growth', 'flowering', 'removed', 'harvested'] as const;
+// Central phase constants — matchen die Integration-State-Werte aus const.py
+export const PHASES = ['seeds', 'germination', 'rooting', 'growing', 'flowering', 'removed', 'harvested'] as const;
 
 export const default_show_bars = [
     "moisture",
@@ -24,7 +27,6 @@ export const default_show_bars = [
 
 export const default_show_elements = [
     "header",
-    "attributes",
     "options"
 ];
 
@@ -34,6 +36,12 @@ export const default_option_elements = [
     "consumption",
     "history",
     "details"
+];
+
+// Vorauswahl für default_expanded_options: Attribute-Bars sind nicht mehr
+// standardmäßig in show_elements, sollen aber im Options-Menü direkt offen sein.
+export const initial_expanded_options = [
+    "attributes"
 ];
 
 export const elementOptions = [
@@ -172,28 +180,21 @@ export const getGrowthPhaseIcon = (phase: string, hass?: HomeAssistant, plantEnt
         }
     }
     
-    // Fallback to string-based matching for backwards compatibility
+    // Fallback to string-based matching — Integration-State-Werte aus const.py
     switch(phase.toLowerCase()) {
-        case 'seed':
-        case 'samen':
+        case 'seeds':
             return 'mdi:seed';
         case 'germination':
-        case 'keimen':
             return 'mdi:seed-outline';
         case 'rooting':
-        case 'wurzeln':
             return 'mdi:sprout';
-        case 'growth':
-        case 'wachstum':
+        case 'growing':
             return 'mdi:leaf';
-        case 'flower':
-        case 'blüte':
+        case 'flowering':
             return 'mdi:flower';
         case 'harvested':
-        case 'geerntet':
             return 'mdi:content-cut';
         case 'removed':
-        case 'entfernt':
             return 'mdi:delete';
         default:
             return 'mdi:help-circle';

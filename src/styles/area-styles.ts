@@ -7,6 +7,10 @@ export const positionStyles: CSSResult = css`
     flex: 1;
     width: 100%;
     height: 100%;
+    /* Default-Größe für Sections-View ohne grid_options. Wenn der User
+       grid_options:rows setzt, gewinnt height:100% über den Parent;
+       wenn nicht (Parent kollabiert), zieht min-height die Card auf. */
+    min-height: 300px;
   }
   
   .container {

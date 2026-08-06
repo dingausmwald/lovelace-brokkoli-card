@@ -121,10 +121,10 @@
           "energy_cost": "Energiekosten"
         },
         "growth_phases": {
-          "seed": "Zaad",
+          "seeds": "Zaad",
           "germination": "Kieming",
           "rooting": "Worteling",
-          "growth": "Groei",
+          "growing": "Groei",
           "flowering": "Bloei",
           "harvested": "Geoogst",
           "removed": "Verwijderd"
@@ -216,5 +216,16 @@
         }
       }
     }
+  },
+  "frontend": {
+    "ui": {
+      "legend_rings_mode_active": "Modus: Ringen (klik om te wisselen)",
+      "legend_labels_mode_active": "Modus: Labels (klik om te wisselen)",
+      "legend_heatmap_mode_active": "Modus: Hittekaart (klik om te wisselen)",
+      "flowering_past": "Bloei verstreken",
+      "flowering_to_go": "Bloei resterend",
+      "days": "Dagen"
+    },
+    "sensors": {}
   }
-} 
+}

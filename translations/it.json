@@ -49,7 +49,7 @@
           "growth_phase": "Fase di Crescita",
           "cycle": "Ciclo",
           "pot_size": "Dimensione Vaso",
-          "flowering_duration": "Durata Fioritura",
+          "flowering_duration": "Durata di Fioritura",
           "strain": "Varietà",
           "breeder": "Allevatore",
           "feminized": "Femminizzata",
@@ -100,7 +100,6 @@
           "rooting_duration": "Durata Radicazione",
           "growth_duration": "Durata di Crescita",
           "flower_duration": "Durata di Fioritura",
-          "flowering_duration": "Durata di Fioritura",
           "harvested_duration": "Durata Raccolta",
           "removed_duration": "Durata Rimozione"
         },
@@ -122,10 +121,10 @@
           "energy_cost": "Costo Energetico"
         },
         "growth_phases": {
-          "seed": "Seme",
+          "seeds": "Seme",
           "germination": "Germinazione",
           "rooting": "Radicazione",
-          "growth": "Crescita",
+          "growing": "Crescita",
           "flowering": "Fioritura",
           "harvested": "Raccolta",
           "removed": "Rimossa"
@@ -217,5 +216,16 @@
         }
       }
     }
+  },
+  "frontend": {
+    "ui": {
+      "legend_rings_mode_active": "Modalità: Anelli (clic per cambiare)",
+      "legend_labels_mode_active": "Modalità: Etichette (clic per cambiare)",
+      "legend_heatmap_mode_active": "Modalità: Mappa di calore (clic per cambiare)",
+      "flowering_past": "Fioritura passata",
+      "flowering_to_go": "Fioritura rimanente",
+      "days": "Giorni"
+    },
+    "sensors": {}
   }
-} 
+}

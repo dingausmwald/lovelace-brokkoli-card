@@ -73,7 +73,12 @@
       "no_matching_sensors": "Keine passenden Sensoren gefunden",
       "other_images": "Andere Bilder",
       "back_to_main_images": "Zurück zu Hauptbildern",
-      "main_images": "Hauptbilder"
+      "main_images": "Hauptbilder",
+      "legend_rings_mode_active": "Modus: Ringe (Klick wechselt)",
+      "legend_labels_mode_active": "Modus: Labels (Klick wechselt)",
+      "legend_heatmap_mode_active": "Modus: Heatmap (Klick wechselt)",
+      "flowering_past": "Bisherige Blüte",
+      "flowering_to_go": "Restliche Blüte"
     },
     "fields": {
       "friendly_name": "Name",
@@ -148,16 +153,22 @@
       "water_consumption": "Wasserverbrauch",
       "fertilizer_consumption": "Düngerverbrauch",
       "power_consumption": "Stromverbrauch",
+      "total_water_consumption": "Gesamter Wasserverbrauch",
+      "total_fertilizer_consumption": "Gesamter Düngerverbrauch",
+      "total_power_consumption": "Gesamter Stromverbrauch",
       "ph": "pH-Wert",
       "health": "Gesundheit",
+      "ppfd_mol": "PPFD",
       "total_ppfd": "Gesamt PPFD",
+      "total_ppfd_mol_integral": "Gesamt PPFD",
+      "total_integral": "Gesamtintegral",
       "energy_cost": "Energiekosten"
     },
     "growth_phases": {
-      "seed": "Samen",
+      "seeds": "Samen",
       "germination": "Keimen",
       "rooting": "Wurzeln",
-      "growth": "Wachstum",
+      "growing": "Wachstum",
       "flowering": "Blüte",
       "harvested": "Geerntet",
       "removed": "Entfernt"
@@ -217,25 +228,6 @@
       "filter_range_to": "bis",
       "add_plant": "Neue Pflanze hinzufügen"
     },
-    "graph": {
-      "temperature": "Temperatur",
-      "conductivity": "Leitfähigkeit",
-      "dli": "DLI",
-      "health": "Gesundheit",
-      "water_consumption": "Wasserverbrauch",
-      "fertilizer_consumption": "Düngerverbrauch",
-      "power_consumption": "Stromverbrauch"
-    },
-    "diagnostics": {
-      "energy_cost": "Energiekosten",
-      "total_power_consumption": "Gesamter Stromverbrauch",
-      "total_integral": "Gesamtintegral",
-      "total_water_consumption": "Gesamter Wasserverbrauch",
-      "total_fertilizer_consumption": "Gesamter Düngerverbrauch",
-      "power_consumption": "Stromverbrauch",
-      "ppfd_mol": "PPFD",
-      "total_ppfd_mol_integral": "Gesamt PPFD"
-    },
     "helpers": {
       "growth_phase": "Wachstumsphase",
       "flowering_duration": "Blütedauer",
@@ -249,4 +241,3 @@
     }
   }
 }
-  

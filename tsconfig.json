@@ -5,6 +5,7 @@
       "noImplicitAny": true,
       "removeComments": true,
       "resolveJsonModule": true,
+      "esModuleInterop": true,
       "preserveConstEnums": true,
       "sourceMap": true,
       "moduleResolution": "Node",

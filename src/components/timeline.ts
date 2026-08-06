@@ -163,7 +163,7 @@ export class FlowerTimeline extends LitElement {
         events.push(...imageEvents);
         
         // Sammle Wachstumsphasen
-        const phases = ['samen', 'keimen', 'wurzeln', 'wachstum', 'blüte', 'entfernt', 'geerntet'] as const;
+        const phases = ['seeds', 'germination', 'rooting', 'growing', 'flowering', 'removed', 'harvested'] as const;
         
         // Sammle alle Phasen-Events
         const phaseEvents: TimelineEvent[] = [];
@@ -172,7 +172,7 @@ export class FlowerTimeline extends LitElement {
             const phaseEntity = this.hass.states[phaseEntityId];
             if (phaseEntity) {
                 for (const phase of phases) {
-                    const startDate = phaseEntity?.attributes[`${phase === 'entfernt' || phase === 'geerntet' ? phase : phase + '_beginn'}`];
+                    const startDate = phaseEntity?.attributes[`${phase === 'removed' || phase === 'harvested' ? phase : phase + '_start'}`];
                     if (startDate) {
                         const event: TimelineEvent = {
                             date: new Date(startDate),
@@ -182,9 +182,9 @@ export class FlowerTimeline extends LitElement {
                         };
                         
                         // Setze Farben für die Events
-                        if (phase === 'entfernt') {
+                        if (phase === 'removed') {
                             event.style = 'display: none;'; // Unsichtbar
-                        } else if (phase === 'geerntet') {
+                        } else if (phase === 'harvested') {
                             // Schraffur mit kleinen Häkchen
                             event.style = `
                                 background-color: hsl(120, 70%, 45%);
@@ -197,7 +197,7 @@ export class FlowerTimeline extends LitElement {
                             `;
                         } else {
                             // Berechne die Position der Phase im Wachstumszyklus (ohne entfernt/geerntet)
-                            const growthPhases = phases.filter(p => p !== 'entfernt' && p !== 'geerntet');
+                            const growthPhases = phases.filter(p => p !== 'removed' && p !== 'harvested');
                             const phaseIndex = growthPhases.indexOf(phase);
                             const lightness = growthPhases.length === 1 ? 55 : 
                                 55 - ((phaseIndex / Math.max(1, growthPhases.length - 1)) * 25); // Hell nach dunkel (55% bis 30%)
@@ -704,15 +704,15 @@ export class FlowerTimeline extends LitElement {
                     startDate = event.date;
                     
                     // Enddatum ist das Startdatum der nächsten Phase oder heute
-                    const phases = ['samen', 'keimen', 'wurzeln', 'wachstum', 'blüte', 'entfernt', 'geerntet'];
+                    const phases = ['seeds', 'germination', 'rooting', 'growing', 'flowering', 'removed', 'harvested'];
                     const currentPhaseIndex = phases.indexOf(phase);
                     
                     if (currentPhaseIndex >= 0 && currentPhaseIndex < phases.length - 1) {
                         // Suche nach dem Startdatum der nächsten Phase
                         const nextPhase = phases[currentPhaseIndex + 1];
-                        const nextPhaseStartAttr = nextPhase === 'entfernt' || nextPhase === 'geerntet' 
+                        const nextPhaseStartAttr = nextPhase === 'removed' || nextPhase === 'harvested' 
                             ? nextPhase 
-                            : `${nextPhase}_beginn`;
+                            : `${nextPhase}_start`;
                         
                         const nextPhaseStart = phaseEntity.attributes[nextPhaseStartAttr];
                         if (nextPhaseStart) {
@@ -805,13 +805,13 @@ export class FlowerTimeline extends LitElement {
         
         // Berechne das erwartete Erntedatum
         let endDate: Date;
-        if (currentPhase === 'entfernt') {
-            endDate = new Date(phaseEntity.attributes.entfernt);
-        } else if (currentPhase === 'geerntet') {
-            endDate = new Date(phaseEntity.attributes.geerntet);
+        if (currentPhase === 'removed') {
+            endDate = new Date(phaseEntity.attributes.removed_date);
+        } else if (currentPhase === 'harvested') {
+            endDate = new Date(phaseEntity.attributes.harvested_date);
         } else {
-            if (currentPhase === 'blüte' && floweringDurationEntity?.state) {
-                const floweringStart = new Date(phaseEntity.attributes.blüte_beginn);
+            if (currentPhase === 'flowering' && floweringDurationEntity?.state) {
+                const floweringStart = new Date(phaseEntity.attributes.flowering_start);
                 endDate = new Date(floweringStart);
                 endDate.setDate(endDate.getDate() + parseInt(floweringDurationEntity.state));
             } else if (floweringDurationEntity?.state) {

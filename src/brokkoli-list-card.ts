@@ -15,6 +15,8 @@ import { StateManager } from './utils/state-manager';
 import { TranslationUtils } from './utils/translation-utils';
 import './components/plant-create-dialog';
 import './components/gallery';
+import './list-editor';
+import { LovelaceCardEditor } from 'custom-card-helpers';
 
 console.info(
     `%c BROKKOLI-LIST-CARD %c ${packageJson.version}`,
@@ -57,6 +59,10 @@ export default class BrokkoliListCard extends LitElement {
 
     static getStubConfig(): BrokkoliListCardConfig {
         return ConfigUtils.getDefaultConfig();
+    }
+
+    public static async getConfigElement(): Promise<LovelaceCardEditor> {
+        return document.createElement('brokkoli-list-card-editor') as LovelaceCardEditor;
     }
 
     setConfig(config: BrokkoliListCardConfig): void {

@@ -20,10 +20,9 @@ export enum DisplayType {
     Compact = "compact"
 }
 
-export interface HomeAssistantEntity extends HassEntity {
-    entity_id: string;
-    state: string;
-}
+// HassEntity hat entity_id und state bereits als string. Kein eigener
+// Interface-Wrapper nötig — Type-Alias reicht.
+export type HomeAssistantEntity = HassEntity;
 
 export interface PlantInfo {
     result: {

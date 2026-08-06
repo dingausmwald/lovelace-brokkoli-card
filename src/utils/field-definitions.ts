@@ -234,20 +234,28 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
         }
     },
 
-    // Phase Begin group
-    ...PHASES.map(phase => ({
-        id: `${phase}_start`,
-        name: (hass: HomeAssistant) => TranslationUtils.translateField(hass, `${phase}_start`),
-        group: 'phasebegin',
-        type: 'date' as FieldType,
-        clickAction: 'edit' as ClickAction,
-        service: PLANT_ATTRIBUTE_SERVICE
-    })),
+    // Phase Begin group — match Integration's select.py date_mapping:
+    // seeds/germination/rooting/growing/flowering nutzen `_start`,
+    // removed/harvested nutzen `_date` (Sonderfall).
+    ...PHASES.map(phase => {
+        const suffix = (phase === 'removed' || phase === 'harvested') ? '_date' : '_start';
+        return {
+            id: `${phase}${suffix}`,
+            name: (hass: HomeAssistant) => TranslationUtils.translateField(hass, `${phase}${suffix}`),
+            group: 'phasebegin',
+            type: 'date' as FieldType,
+            clickAction: 'edit' as ClickAction,
+            service: PLANT_ATTRIBUTE_SERVICE,
+        };
+    }),
 
-    // Phase Duration group
+    // Phase Duration group — matches Integration's select.py duration_mapping
+    // (seeds_duration / germination_duration / rooting_duration /
+    //  growing_duration / flower_duration / harvested_duration /
+    //  removed_duration).
     {
-        id: 'seed_duration',
-        name: (hass: HomeAssistant) => TranslationUtils.translateField(hass, 'seed_duration'),
+        id: 'seeds_duration',
+        name: (hass: HomeAssistant) => TranslationUtils.translateField(hass, 'seeds_duration'),
         group: 'phaseduration',
         type: 'number' as FieldType,
         clickAction: 'edit' as ClickAction,
@@ -285,8 +293,8 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
         }
     },
     {
-        id: 'growth_duration',
-        name: (hass: HomeAssistant) => TranslationUtils.translateField(hass, 'growth_duration'),
+        id: 'growing_duration',
+        name: (hass: HomeAssistant) => TranslationUtils.translateField(hass, 'growing_duration'),
         group: 'phaseduration',
         type: 'number' as FieldType,
         clickAction: 'edit' as ClickAction,

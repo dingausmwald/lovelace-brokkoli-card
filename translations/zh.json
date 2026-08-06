@@ -100,7 +100,6 @@
           "rooting_duration": "生根持续时间",
           "growth_duration": "生长持续时间",
           "flower_duration": "开花持续时间",
-          "flowering_duration": "开花持续时间",
           "harvested_duration": "收获持续时间",
           "removed_duration": "移除持续时间"
         },
@@ -122,10 +121,10 @@
           "energy_cost": "能源成本"
         },
         "growth_phases": {
-          "seed": "种子",
+          "seeds": "种子",
           "germination": "发芽",
           "rooting": "生根",
-          "growth": "生长",
+          "growing": "生长",
           "flowering": "开花",
           "harvested": "已收获",
           "removed": "已移除"
@@ -217,5 +216,16 @@
         }
       }
     }
+  },
+  "frontend": {
+    "ui": {
+      "legend_rings_mode_active": "模式：环形（点击切换）",
+      "legend_labels_mode_active": "模式：标签（点击切换）",
+      "legend_heatmap_mode_active": "模式：热力图（点击切换）",
+      "flowering_past": "已过开花期",
+      "flowering_to_go": "剩余开花期",
+      "days": "天"
+    },
+    "sensors": {}
   }
-} 
+}

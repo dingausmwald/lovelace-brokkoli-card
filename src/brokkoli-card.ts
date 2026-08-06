@@ -5,7 +5,7 @@ import { style } from './styles';
 import { DisplayType, BrokkoliCardConfig, HomeAssistantEntity, PlantInfo } from './types/brokkoli-card-types';
 import * as packageJson from '../package.json';
 import { renderAttributes, renderBattery } from './utils/attributes';
-import { CARD_EDITOR_NAME, CARD_NAME, default_show_bars, default_show_elements, default_option_elements, missingImage, getGrowthPhaseIcon } from './utils/constants';
+import { CARD_EDITOR_NAME, CARD_NAME, default_show_bars, default_show_elements, default_option_elements, initial_expanded_options, missingImage, getGrowthPhaseIcon } from './utils/constants';
 import { moreInfo } from './utils/utils';
 import { TranslationUtils } from './utils/translation-utils';
 import './components/gallery';
@@ -149,7 +149,8 @@ export default class BrokkoliCard extends LitElement {
             battery_sensor: "sensor.myflower_battery",
             show_bars: [...default_show_bars],
             show_elements: [...default_show_elements],
-            option_elements: [...default_option_elements]
+            option_elements: [...default_option_elements],
+            default_expanded_options: [...initial_expanded_options]
         }
     }
 
@@ -163,7 +164,8 @@ export default class BrokkoliCard extends LitElement {
             ...config,
             // Setze Standardwerte nur, wenn die entsprechenden Eigenschaften nicht definiert sind
             show_elements: config.show_elements || [...default_show_elements],
-            option_elements: config.option_elements || [...default_option_elements]
+            option_elements: config.option_elements || [...default_option_elements],
+            default_expanded_options: config.default_expanded_options || [...initial_expanded_options]
         };
         
         // Setze den Card-Selektor, falls vorhanden
@@ -235,10 +237,11 @@ export default class BrokkoliCard extends LitElement {
                 memberPlants = growthPhaseEntity.attributes.member_plants;
             }
         } else if (isCycle) {
-            // Bei einem Cycle die member_plants direkt aus dem Cycle holen
-            const cycleName = this.stateObj.entity_id.split('.')[1];
-            const growthPhaseEntity = this._hass.states[`select.${cycleName}_growth_phase`];
-            
+            // Bei einem Cycle die member_plants direkt aus dem Cycle holen.
+            // entity_id der growth_phase aus plant/get_info (sprachneutral).
+            const cycleGrowthPhaseId = (this.plantinfo as { result?: { helpers?: { growth_phase?: { entity_id?: string } } } })?.result?.helpers?.growth_phase?.entity_id;
+            const growthPhaseEntity = cycleGrowthPhaseId ? this._hass.states[cycleGrowthPhaseId] : undefined;
+
             if (growthPhaseEntity && growthPhaseEntity.attributes.member_plants) {
                 memberPlants = growthPhaseEntity.attributes.member_plants;
             }
@@ -259,8 +262,12 @@ export default class BrokkoliCard extends LitElement {
             infoLine = this.stateObj.attributes.strain + " - " + this.stateObj.attributes.breeder;
         }
         
-        const growthPhaseEntity = this._hass.states[`select.${plantName}_growth_phase`];
-        const potSizeEntity = this._hass.states[`number.${plantName}_pot_size`];
+        // Helper-entity_ids aus plant/get_info-Response (sprachneutral, locale-unabhängig).
+        const helpers = (this.plantinfo as { result?: { helpers?: Record<string, { entity_id?: string }> } })?.result?.helpers;
+        const growthPhaseEntityId = helpers?.growth_phase?.entity_id;
+        const potSizeEntityId = helpers?.pot_size?.entity_id;
+        const growthPhaseEntity = growthPhaseEntityId ? this._hass.states[growthPhaseEntityId] : undefined;
+        const potSizeEntity = potSizeEntityId ? this._hass.states[potSizeEntityId] : undefined;
 
         const unavailableText = TranslationUtils.translateUI(this._hass, 'unavailable');
         const growthPhase = growthPhaseEntity ? TranslationUtils.translateGrowthPhase(this._hass, growthPhaseEntity.state) : unavailableText;
@@ -303,11 +310,11 @@ export default class BrokkoliCard extends LitElement {
                 }
                 ${this.config.display_type !== DisplayType.Compact ? html`
                 <div id="status-container">
-                    <span @click="${() => moreInfo(this, `number.${plantName}_pot_size`)}">
+                    <span @click="${() => potSizeEntityId && moreInfo(this, potSizeEntityId)}">
                         <ha-icon icon="mdi:cup"></ha-icon>${potSize}
                     </span>
-                    <span @click="${() => moreInfo(this, `select.${plantName}_growth_phase`)}">
-                        <ha-icon icon="${this.getGrowthPhaseIcon(growthPhase)}"></ha-icon>${growthPhase}
+                    <span @click="${() => growthPhaseEntityId && moreInfo(this, growthPhaseEntityId)}">
+                        <ha-icon icon="${this.getGrowthPhaseIcon(growthPhaseEntity?.state ?? growthPhase)}"></ha-icon>${growthPhase}
                     </span>
                     </div>
                 ` : ''}
@@ -604,13 +611,19 @@ export default class BrokkoliCard extends LitElement {
 
     private async _handleReplaceSensors() {
         const sensorTypes = ['temperature', 'moisture', 'illuminance', 'humidity', 'conductivity', 'power_consumption'];
-        const plantName = this.stateObj.entity_id.split('.')[1];
-        
+        // Source-Sensor-entity_ids aus plant/get_info (sprachneutral) statt sensor.X_TYPE Konstruktion.
+        const plantInfoResult = (this.plantinfo as { result?: Record<string, { sensor?: string } | undefined> & { diagnostic_sensors?: Record<string, { entity_id?: string }> } })?.result;
+        const plantData = (plantInfoResult ?? {}) as Record<string, { sensor?: string }>;
+        const diagSensors = plantInfoResult?.diagnostic_sensors ?? {};
+
         for (const type of sensorTypes) {
             const newSensor = this._popupData[`new_${type}_sensor`];
-            
-            if (newSensor) {
-                const currentSensor = `sensor.${plantName}_${type}`;
+            // power_consumption: replace_external_sensor sitzt auf der TOTAL-Entity.
+            const currentSensor = type === 'power_consumption'
+                ? diagSensors.total_power_consumption?.entity_id
+                : plantData[type]?.sensor;
+
+            if (newSensor && currentSensor) {
                 await this._hass.callService('plant', 'replace_sensor', {
                     meter_entity: currentSensor,
                     new_sensor: newSensor
@@ -679,7 +692,7 @@ export default class BrokkoliCard extends LitElement {
                                @input="${(e: InputEvent) => this._popupData.conductivity_sensor = (e.target as HTMLInputElement).value}">
                     </div>
                     <div class="form-field">
-                        <label>${TranslationUtils.translateSensor(this._hass, 'power_consumption')}</label>
+                        <label>${TranslationUtils.translateSensor(this._hass, 'total_power_consumption')}</label>
                         <input type="text" .value="${this._popupData.power_consumption_sensor || ''}"
                                @input="${(e: InputEvent) => this._popupData.power_consumption_sensor = (e.target as HTMLInputElement).value}">
                     </div>
@@ -742,62 +755,62 @@ export default class BrokkoliCard extends LitElement {
     }
 
     private _renderReplacePopup(): TemplateResult {
-        const plantName = this.stateObj.entity_id.split('.')[1];
-        
         const sensorTypes = [
             { key: 'temperature', label: TranslationUtils.translateSensor(this._hass, 'temperature'), icon: 'mdi:thermometer' },
             { key: 'moisture', label: TranslationUtils.translateSensor(this._hass, 'soil_moisture'), icon: 'mdi:water-percent' },
             { key: 'illuminance', label: TranslationUtils.translateSensor(this._hass, 'illuminance'), icon: 'mdi:brightness-5' },
             { key: 'humidity', label: TranslationUtils.translateSensor(this._hass, 'air_humidity'), icon: 'mdi:water' },
             { key: 'conductivity', label: TranslationUtils.translateSensor(this._hass, 'conductivity'), icon: 'mdi:flash' },
-            { key: 'power_consumption', label: TranslationUtils.translateSensor(this._hass, 'power_consumption'), icon: 'mdi:power-plug' }
+            // Stromverbrauch verkabelt die TOTAL-kWh-Entity (nicht die berechnete Watt-Live).
+            // Label entsprechend "Gesamt Stromverbrauch" um die Differenzierung sichtbar zu machen.
+            { key: 'power_consumption', label: TranslationUtils.translateSensor(this._hass, 'total_power_consumption'), icon: 'mdi:power-plug' }
         ];
 
-        // Filtere alle verfügbaren Sensoren nach Typ
+        // Aktuell konfigurierte external_sensor je Typ — aus plantInfo (sprachneutral).
+        const plantInfoResult = (this.plantinfo as { result?: Record<string, { sensor?: string } | undefined> & { diagnostic_sensors?: Record<string, { entity_id?: string }> } })?.result;
+        const plantData = (plantInfoResult ?? {}) as Record<string, { sensor?: string }>;
+        const diagSensors = plantInfoResult?.diagnostic_sensors ?? {};
+        const currentSourcePerType: Record<string, string | undefined> = {};
+        for (const t of sensorTypes) {
+            // power_consumption: external_sensor sitzt auf der TOTAL-Entity (kWh-Akkumulator),
+            // nicht auf der CURRENT-Watt-Entity (die ist rein berechnet aus TOTAL).
+            const lookupEntityId = t.key === 'power_consumption'
+                ? diagSensors.total_power_consumption?.entity_id
+                : plantData[t.key]?.sensor;
+            currentSourcePerType[t.key] = lookupEntityId
+                ? this._hass.states[lookupEntityId]?.attributes?.external_sensor as string | undefined
+                : undefined;
+        }
+
+        // Filtere verfügbare Source-Sensoren nach Typ.
+        // Plant-Integration-eigene Sensoren erkennt man am `external_sensor`-Attribut —
+        // sprachneutral, weil unabhängig vom entity_id-Slug.
         const getSensorsByType = (type: string): Array<{entity_id: string, name: string}> => {
-            // Erstelle ein Muster, um Sensoren der Plant Integration zu identifizieren
-            // Wir müssen für alle Typen ein allgemeines Muster verwenden
-            const plantSensorPattern = new RegExp(`^sensor\\..*_(${type}|min_${type}|max_${type}|soil_moisture|air_humidity)$`);
-            
             return Object.entries(this._hass.states)
-                .filter(([entity_id]) => {
-                    // Nur Sensoren berücksichtigen
+                .filter(([entity_id, state]: [string, HomeAssistantEntity]) => {
                     if (!entity_id.startsWith('sensor.')) return false;
-                    
-                    // Sensoren der Plant Integration ausschließen
-                    if (plantSensorPattern.test(entity_id)) return false;
-                    
-                    // Spezifische Sensoren dieser Pflanze ausschließen
-                    if (entity_id.includes(`${plantName}_`)) return false;
-                    
-                    // Alle Sensoren mit "plant" im Namen ausschließen
-                    if (entity_id.includes('plant')) return false;
-                    
+                    // Plant-Integration-Sensoren rauswerfen (egal welche Pflanze).
+                    if (state.attributes && 'external_sensor' in state.attributes) return false;
                     return true;
                 })
                 .filter(([, state]: [string, HomeAssistantEntity]) => {
-                    // Filtere nach Sensortyp basierend auf Attributen oder Einheiten
                     const deviceClass = state.attributes?.device_class;
                     const unit = state.attributes?.unit_of_measurement;
-                    
                     switch(type) {
                         case 'temperature':
                             return deviceClass === 'temperature' || unit === '°C' || unit === '°F';
                         case 'moisture':
-                            return deviceClass === 'humidity' || unit === '%';
+                            return deviceClass === 'moisture' || (deviceClass === 'humidity' && unit === '%');
                         case 'illuminance':
                             return deviceClass === 'illuminance' || unit === 'lx' || unit === 'lm';
                         case 'humidity':
                             return deviceClass === 'humidity' || unit === '%';
                         case 'conductivity':
-                            return unit === 'µS/cm' || unit === 'mS/cm';
+                            return deviceClass === 'conductivity' || unit === 'µS/cm' || unit === 'mS/cm';
                         case 'power_consumption':
-                            return deviceClass === 'power' || 
-                                   deviceClass === 'energy' || 
-                                   unit === 'W' || 
-                                   unit === 'kW' || 
-                                   unit === 'kWh' || 
-                                   unit === 'Wh';
+                            return deviceClass === 'power' ||
+                                   deviceClass === 'energy' ||
+                                   unit === 'W' || unit === 'kW' || unit === 'kWh' || unit === 'Wh';
                         default:
                             return false;
                     }
@@ -814,7 +827,13 @@ export default class BrokkoliCard extends LitElement {
                     <div class="popup-title">${TranslationUtils.translateUI(this._hass, 'replace_sensors')}</div>
                     ${sensorTypes.map(type => {
                         const availableSensors = getSensorsByType(type.key);
-                        
+                        const current = currentSourcePerType[type.key];
+                        // Aktuelle Auswahl ins _popupData kippen, damit beim Submit auch ohne
+                        // Klick im Dropdown der jetzt-Wert übernommen wird (statt leerem String).
+                        if (current && !this._popupData[`new_${type.key}_sensor`]) {
+                            this._popupData[`new_${type.key}_sensor`] = current;
+                        }
+
                         return html`
                             <div class="form-field">
                                 <label>
@@ -823,10 +842,10 @@ export default class BrokkoliCard extends LitElement {
                                 </label>
                                 <select @change="${(e: Event) => this._popupData[`new_${type.key}_sensor`] = (e.target as HTMLSelectElement).value}">
                                     <option value="">${TranslationUtils.translateUI(this._hass, 'please_select')}</option>
-                                    ${availableSensors.length > 0 ? 
+                                    ${availableSensors.length > 0 ?
                                         availableSensors.map(sensor => html`
-                                            <option value="${sensor.entity_id}">${sensor.name}</option>
-                                        `) : 
+                                            <option value="${sensor.entity_id}" ?selected="${sensor.entity_id === current}">${sensor.name}</option>
+                                        `) :
                                         html`<option value="" disabled>${TranslationUtils.translateUI(this._hass, 'no_matching_sensors')}</option>`
                                     }
                                 </select>
@@ -1396,12 +1415,12 @@ export default class BrokkoliCard extends LitElement {
         
         if (!phaseEntity) return images;
 
-        const phases = ['samen', 'keimen', 'wurzeln', 'wachstum', 'blüte', 'geerntet', 'entfernt'];
+        const phases = ['seeds', 'germination', 'rooting', 'growing', 'flowering', 'harvested', 'removed'];
         
         // Finde die erste Phase
         let firstPhaseDate: Date | null = null;
         for (const phase of phases) {
-            const startDate = phaseEntity.attributes[`${phase === 'entfernt' || phase === 'geerntet' ? phase : phase + '_beginn'}`];
+            const startDate = phaseEntity.attributes[`${phase === 'removed' || phase === 'harvested' ? phase : phase + '_start'}`];
             if (startDate) {
                 firstPhaseDate = new Date(startDate);
                 break;

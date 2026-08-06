@@ -49,7 +49,7 @@
           "growth_phase": "Növekedési Fázis",
           "cycle": "Ciklus",
           "pot_size": "Cserép Mérete",
-          "flowering_duration": "Virágzás Időtartama",
+          "flowering_duration": "Virágzási időtartam",
           "strain": "Fajta",
           "breeder": "Tenyésztő",
           "feminized": "Nőstény",
@@ -100,7 +100,6 @@
           "rooting_duration": "Gyökeresedés Időtartam",
           "growth_duration": "Növekedési időtartam",
           "flower_duration": "Virágzási időtartam",
-          "flowering_duration": "Virágzási időtartam",
           "harvested_duration": "Betakarítás Időtartam",
           "removed_duration": "Eltávolítás Időtartam"
         },
@@ -122,10 +121,10 @@
           "energy_cost": "Energia Költség"
         },
         "growth_phases": {
-          "seed": "Mag",
+          "seeds": "Mag",
           "germination": "Csírázás",
           "rooting": "Gyökeresedés",
-          "growth": "Növekedés",
+          "growing": "Növekedés",
           "flowering": "Virágzás",
           "harvested": "Betakarítva",
           "removed": "Eltávolítva"
@@ -217,5 +216,16 @@
         }
       }
     }
+  },
+  "frontend": {
+    "ui": {
+      "legend_rings_mode_active": "Mód: Gyűrűk (kattintson a váltáshoz)",
+      "legend_labels_mode_active": "Mód: Címkék (kattintson a váltáshoz)",
+      "legend_heatmap_mode_active": "Mód: Hőtérkép (kattintson a váltáshoz)",
+      "flowering_past": "Eltelt virágzás",
+      "flowering_to_go": "Hátralévő virágzás",
+      "days": "Napok"
+    },
+    "sensors": {}
   }
-} 
+}

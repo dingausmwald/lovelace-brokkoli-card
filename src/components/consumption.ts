@@ -3,6 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { HomeAssistant, fireEvent } from 'custom-card-helpers';
 import { style } from '../styles/consumption-styles';
 import { TranslationUtils } from '../utils/translation-utils';
+import { PlantEntityUtils } from '../utils/plant-entity-utils';
 
 interface ApexChart {
     render(): Promise<void>;
@@ -121,6 +122,20 @@ const COLOR_CONFIG = {
     image: { hue: 175, saturation: 70 }
 } as const;
 
+type PlantInfoHelpers = {
+    helpers?: {
+        growth_phase?: { entity_id?: string };
+        flowering_duration?: { entity_id?: string };
+    };
+    diagnostic_sensors?: {
+        total_integral?: { entity_id?: string };
+        total_water_consumption?: { entity_id?: string };
+        total_fertilizer_consumption?: { entity_id?: string };
+        total_power_consumption?: { entity_id?: string };
+        energy_cost?: { entity_id?: string };
+    };
+};
+
 @customElement('flower-consumption')
 export class FlowerConsumption extends LitElement {
     @property() hass?: HomeAssistant;
@@ -129,8 +144,15 @@ export class FlowerConsumption extends LitElement {
     @state() private _selectedPhase: string | null = null;
     @state() private _phaseData: Map<string, PhaseInfo> = new Map();
     @state() private _consumptionData: ConsumptionData | null = null;
+    @state() private _plantInfo: PlantInfoHelpers | null = null;
     private _lastOptions: Map<string, ApexChartsOptions> = new Map();
     private _lastPhaseData: Map<string, string> = new Map();
+
+    private async _loadPlantInfo(plantEntityId: string): Promise<void> {
+        if (!this.hass) return;
+        const info = await PlantEntityUtils.getPlantInfo(this.hass, plantEntityId);
+        this._plantInfo = info as PlantInfoHelpers | null;
+    }
 
     static styles = style;
 
@@ -177,23 +199,27 @@ export class FlowerConsumption extends LitElement {
         const startTime = phaseInfo.start.toISOString();
         const endTime = (phaseInfo.end || new Date()).toISOString();
 
-        // Lade Verbrauchsdaten für den Zeitraum
+        // Lade Verbrauchsdaten für den Zeitraum — entity_ids aus plant/get_info
+        // (sprachneutral, statt hartkodierter sensor.X_total_Y Patterns).
         try {
+            const diag = this._plantInfo?.diagnostic_sensors;
             const sensors = [
-                `sensor.${plantName}_total_ppfd_mol_integral`,
-                `sensor.${plantName}_total_fertilizer_consumption`,
-                `sensor.${plantName}_total_water_consumption`,
-                `sensor.${plantName}_total_power_consumption`,
-                `sensor.${plantName}_energy_cost`
+                diag?.total_integral?.entity_id,
+                diag?.total_fertilizer_consumption?.entity_id,
+                diag?.total_water_consumption?.entity_id,
+                diag?.total_power_consumption?.entity_id,
+                diag?.energy_cost?.entity_id,
             ];
+            if (sensors.some(s => !s)) {
+                return; // plantInfo noch nicht geladen oder Plant ohne Diagnostics
+            }
 
-            const promises = sensors.map(sensor => 
+            const promises = sensors.map(sensor =>
                 this.hass!.callApi('GET', `history/period/${startTime}?filter_entity_id=${sensor}&end_time=${endTime}`)
             );
 
             const results = await Promise.all(promises);
             
-            // Berechne die Differenzen
             const calculateDiff = (history: Array<Array<{state: string; last_changed: string}>>) => {
                 if (!history || !history[0] || history[0].length < 2) return 0;
                 const values = history[0]
@@ -237,6 +263,14 @@ export class FlowerConsumption extends LitElement {
 
         const plantName = this.entityId.split('.')[1];
 
+        // Entity-IDs aus plant/get_info (sprachneutral) — keine hartkodierten sensor.X_total_Y Patterns.
+        const diag = this._plantInfo?.diagnostic_sensors;
+        const ppfdId = diag?.total_integral?.entity_id ?? '';
+        const fertId = diag?.total_fertilizer_consumption?.entity_id ?? '';
+        const waterId = diag?.total_water_consumption?.entity_id ?? '';
+        const powerId = diag?.total_power_consumption?.entity_id ?? '';
+        const costId = diag?.energy_cost?.entity_id ?? '';
+
         // Formatierungsfunktion für die Werte
         const formatValue = (value: number | string, decimals: number = 1): string => {
             if (typeof value === 'string') value = parseFloat(value);
@@ -245,58 +279,58 @@ export class FlowerConsumption extends LitElement {
 
         return html`
             <div class="consumption-data">
-                <div class="consumption-item" @click="${() => this._showMoreInfo(`sensor.${plantName}_total_ppfd_mol_integral`)}">
+                <div class="consumption-item" @click="${() => ppfdId && this._showMoreInfo(ppfdId)}">
                     <ha-icon icon="mdi:counter"></ha-icon>
                     <div class="consumption-details">
                         <span class="label">${TranslationUtils.translateSensor(this.hass, 'total_ppfd')}</span>
                         <span class="value consumption-value">${
-                            formatValue(this._consumptionData ? 
-                                this._consumptionData.ppfd : 
-                                this.hass.states[`sensor.${plantName}_total_ppfd_mol_integral`]?.state || 'N/A')
+                            formatValue(this._consumptionData ?
+                                this._consumptionData.ppfd :
+                                (ppfdId ? this.hass.states[ppfdId]?.state : null) || 'N/A')
                         } mol/s⋅m²</span>
                     </div>
                 </div>
-                <div class="consumption-item" @click="${() => this._showMoreInfo(`sensor.${plantName}_total_fertilizer_consumption`)}">
+                <div class="consumption-item" @click="${() => fertId && this._showMoreInfo(fertId)}">
                     <ha-icon icon="mdi:chart-line-variant"></ha-icon>
                     <div class="consumption-details">
-                        <span class="label">${TranslationUtils.translateSensor(this.hass, 'fertilizer_consumption')}</span>
+                        <span class="label">${TranslationUtils.translateSensor(this.hass, 'total_fertilizer_consumption')}</span>
                         <span class="value consumption-value">${
-                            formatValue(this._consumptionData ? 
-                                this._consumptionData.fertilizer : 
-                                this.hass.states[`sensor.${plantName}_total_fertilizer_consumption`]?.state || 'N/A')
-                        } μS/cm</span>
+                            formatValue(this._consumptionData ?
+                                this._consumptionData.fertilizer :
+                                (fertId ? this.hass.states[fertId]?.state : null) || 'N/A')
+                        } ${(fertId ? this.hass.states[fertId]?.attributes?.unit_of_measurement : null) ?? 'mS/cm'}</span>
                     </div>
                 </div>
-                <div class="consumption-item" @click="${() => this._showMoreInfo(`sensor.${plantName}_total_water_consumption`)}">
+                <div class="consumption-item" @click="${() => waterId && this._showMoreInfo(waterId)}">
                     <ha-icon icon="mdi:water-pump"></ha-icon>
                     <div class="consumption-details">
-                        <span class="label">${TranslationUtils.translateSensor(this.hass, 'water_consumption')}</span>
+                        <span class="label">${TranslationUtils.translateSensor(this.hass, 'total_water_consumption')}</span>
                         <span class="value consumption-value">${
-                            formatValue(this._consumptionData ? 
-                                this._consumptionData.water : 
-                                this.hass.states[`sensor.${plantName}_total_water_consumption`]?.state || 'N/A')
+                            formatValue(this._consumptionData ?
+                                this._consumptionData.water :
+                                (waterId ? this.hass.states[waterId]?.state : null) || 'N/A')
                         } L</span>
                     </div>
                 </div>
-                <div class="consumption-item" @click="${() => this._showMoreInfo(`sensor.${plantName}_total_power_consumption`)}">
+                <div class="consumption-item" @click="${() => powerId && this._showMoreInfo(powerId)}">
                     <ha-icon icon="mdi:lightning-bolt"></ha-icon>
                     <div class="consumption-details">
-                        <span class="label">${TranslationUtils.translateSensor(this.hass, 'power_consumption')}</span>
+                        <span class="label">${TranslationUtils.translateSensor(this.hass, 'total_power_consumption')}</span>
                         <span class="value consumption-value">${
-                            formatValue(this._consumptionData ? 
-                                this._consumptionData.power : 
-                                this.hass.states[`sensor.${plantName}_total_power_consumption`]?.state || 'N/A')
+                            formatValue(this._consumptionData ?
+                                this._consumptionData.power :
+                                (powerId ? this.hass.states[powerId]?.state : null) || 'N/A')
                         } kWh</span>
                     </div>
                 </div>
-                <div class="consumption-item large" @click="${() => this._showMoreInfo(`sensor.${plantName}_energy_cost`)}">
+                <div class="consumption-item large" @click="${() => costId && this._showMoreInfo(costId)}">
                     <ha-icon icon="mdi:cash-multiple"></ha-icon>
                     <div class="consumption-details large">
                         <span class="label">${TranslationUtils.translateSensor(this.hass, 'energy_cost')}</span>
                         <span class="value consumption-value">${
                             formatValue(this._consumptionData ? 
                                 this._consumptionData.cost : 
-                                this.hass.states[`sensor.${plantName}_energy_cost`]?.state || 'N/A', 2)
+                                (costId ? this.hass.states[costId]?.state : null) || 'N/A', 2)
                         } €</span>
                     </div>
                 </div>
@@ -311,7 +345,8 @@ export class FlowerConsumption extends LitElement {
     }
 
     private _renderPieChart(plantName: string): TemplateResult {
-        const growthPhaseEntity = this.hass.states[`select.${plantName}_growth_phase`];
+        const growthPhaseEntityId = this._plantInfo?.helpers?.growth_phase?.entity_id;
+        const growthPhaseEntity = growthPhaseEntityId ? this.hass.states[growthPhaseEntityId] : undefined;
         
         if (!growthPhaseEntity) {
             return html`
@@ -323,8 +358,8 @@ export class FlowerConsumption extends LitElement {
 
         const phaseDurations: PhaseDurations = {
             'Seed': this._calculatePhaseDuration(
-                growthPhaseEntity.attributes.seed_start,
-                growthPhaseEntity.attributes.seed_duration
+                growthPhaseEntity.attributes.seeds_start,
+                growthPhaseEntity.attributes.seeds_duration
             ),
             'Germination': this._calculatePhaseDuration(
                 growthPhaseEntity.attributes.germination_start,
@@ -335,19 +370,20 @@ export class FlowerConsumption extends LitElement {
                 growthPhaseEntity.attributes.rooting_duration
             ),
             'Growth': this._calculatePhaseDuration(
-                growthPhaseEntity.attributes.growth_start,
-                growthPhaseEntity.attributes.growth_duration
+                growthPhaseEntity.attributes.growing_start,
+                growthPhaseEntity.attributes.growing_duration
             ),
             'Flowering Past': 0,
             'Flowering To Go': 0,
             'Harvested': this._calculatePhaseDuration(
-                growthPhaseEntity.attributes.harvested,
+                growthPhaseEntity.attributes.harvested_date,
                 growthPhaseEntity.attributes.harvested_duration
             )
         };
 
         // Setze die Blütephase-Dauer direkt aus flowering_duration
-        const floweringDurationEntity = this.hass.states[`number.${plantName}_flowering_duration`];
+        const floweringDurationEntityId = this._plantInfo?.helpers?.flowering_duration?.entity_id;
+        const floweringDurationEntity = floweringDurationEntityId ? this.hass.states[floweringDurationEntityId] : undefined;
         const floweringStartDateAttr = growthPhaseEntity.attributes.flowering_start;
         
         // Prüfe ob floweringStartDateAttr einen gültigen Wert hat
@@ -392,26 +428,29 @@ ${TranslationUtils.translateUI(this.hass, 'no_completed_phases')}
 
     private _calculatePhaseDuration(startDate: string | null, duration: number | null): number {
         if (!startDate || startDate === 'null' || startDate === '') return 0;
-        
+
         if (duration) return duration;
-        
+
         // Wenn keine Dauer gesetzt ist, aber ein Startdatum existiert,
-        // berechne die Dauer als Differenz von heute zum Startdatum
+        // berechne die Dauer als Differenz von heute zum Startdatum.
+        // Mindestens 1 zurückgeben damit eine aktive Phase < 1 Tag im
+        // Pie-Chart sichtbar bleibt (sonst filtert .filter(v>0) sie raus).
         const start = new Date(startDate);
         const now = new Date();
-        return Math.max(0, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+        const days = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        return Math.max(1, days);
     }
 
     private _getPhaseDataString(growthPhaseEntity: { attributes: Record<string, unknown> }): string {
         if (!growthPhaseEntity) return '';
         
         return JSON.stringify({
-            samen: growthPhaseEntity.attributes.samen_dauer || 0,
-            keimen: growthPhaseEntity.attributes.keimen_dauer || 0,
-            wurzeln: growthPhaseEntity.attributes.wurzeln_dauer || 0,
-            wachstum: growthPhaseEntity.attributes.wachstum_dauer || 0,
-            bluete: growthPhaseEntity.attributes.blüte_dauer || 0,
-            geerntet: growthPhaseEntity.attributes.geerntet_dauer || 0
+            samen: growthPhaseEntity.attributes.seeds_duration || 0,
+            keimen: growthPhaseEntity.attributes.germination_duration || 0,
+            wurzeln: growthPhaseEntity.attributes.rooting_duration || 0,
+            wachstum: growthPhaseEntity.attributes.growing_duration || 0,
+            bluete: growthPhaseEntity.attributes.flower_duration || 0,
+            geerntet: growthPhaseEntity.attributes.harvested_duration || 0
         });
     }
 
@@ -432,7 +471,8 @@ ${TranslationUtils.translateUI(this.hass, 'no_completed_phases')}
         const chartElement = this.shadowRoot?.querySelector(`#pie-chart-${plantName}`);
         if (!chartElement) return;
 
-        const growthPhaseEntity = this.hass?.states[`select.${plantName}_growth_phase`];
+        const growthPhaseEntityId = this._plantInfo?.helpers?.growth_phase?.entity_id;
+        const growthPhaseEntity = growthPhaseEntityId ? this.hass?.states[growthPhaseEntityId] : undefined;
         if (!growthPhaseEntity) return;
 
         // Prüfe ob sich die Daten geändert haben
@@ -447,8 +487,8 @@ ${TranslationUtils.translateUI(this.hass, 'no_completed_phases')}
 
         const phaseDurations: PhaseDurations = {
             'Seed': this._calculatePhaseDuration(
-                growthPhaseEntity.attributes.seed_start,
-                growthPhaseEntity.attributes.seed_duration
+                growthPhaseEntity.attributes.seeds_start,
+                growthPhaseEntity.attributes.seeds_duration
             ),
             'Germination': this._calculatePhaseDuration(
                 growthPhaseEntity.attributes.germination_start,
@@ -459,20 +499,21 @@ ${TranslationUtils.translateUI(this.hass, 'no_completed_phases')}
                 growthPhaseEntity.attributes.rooting_duration
             ),
             'Growth': this._calculatePhaseDuration(
-                growthPhaseEntity.attributes.growth_start,
-                growthPhaseEntity.attributes.growth_duration
+                growthPhaseEntity.attributes.growing_start,
+                growthPhaseEntity.attributes.growing_duration
             ),
             'Flowering Past': 0,
             'Flowering To Go': 0,
             'Harvested': this._calculatePhaseDuration(
-                growthPhaseEntity.attributes.harvested,
+                growthPhaseEntity.attributes.harvested_date,
                 growthPhaseEntity.attributes.harvested_duration
             )
         };
 
         // Setze die Blütephase-Dauer direkt aus flowering_duration
-        const floweringDurationEntity = this.hass.states[`number.${plantName}_flowering_duration`];
-        const blueteStartDate = growthPhaseEntity.attributes.blüte_beginn;
+        const floweringDurationEntityId = this._plantInfo?.helpers?.flowering_duration?.entity_id;
+        const floweringDurationEntity = floweringDurationEntityId ? this.hass.states[floweringDurationEntityId] : undefined;
+        const blueteStartDate = growthPhaseEntity.attributes.flowering_start;
         
         // Prüfe ob blueteStartDate einen gültigen Wert hat
         const isValidBlueteStart = blueteStartDate && blueteStartDate !== 'null' && blueteStartDate !== '';
@@ -488,19 +529,33 @@ ${TranslationUtils.translateUI(this.hass, 'no_completed_phases')}
                 if (daysInFlowering >= 0) {  // Nur wenn wir bereits in der Blütephase sind
                     phaseDurations['Flowering Past'] = Math.min(daysInFlowering, totalFloweringDuration);
                     phaseDurations['Flowering To Go'] = Math.max(0, totalFloweringDuration - daysInFlowering);
-                } else {
-                    phaseDurations['Flowering To Go'] = totalFloweringDuration;
                 }
-            } else {
-                // Wenn keine Blütephase begonnen hat, zeige die gesamte Zeit als "To Go"
-                phaseDurations['Flowering To Go'] = totalFloweringDuration;
+                // flowering_start in der Zukunft oder noch nicht gesetzt → keine
+                // planned-Segmente im Pie, damit nicht verwechselt wird mit
+                // tatsächlich gelaufener Phase (Klick liefert sonst 0 Verbrauch).
             }
         }
+
+        // Mapping englischer Internal-Keys auf lokalisierte Anzeige-Labels.
+        // Wachstumsphasen kommen aus den growth_phases-Translations;
+        // 'Flowering Past'/'To Go' sind eigene UI-Strings.
+        const t = TranslationUtils;
+        const labelMap: Record<string, string> = {
+            'Seed':           t.translateGrowthPhase(this.hass, 'seeds'),
+            'Germination':    t.translateGrowthPhase(this.hass, 'germination'),
+            'Rooting':        t.translateGrowthPhase(this.hass, 'rooting'),
+            'Growth':         t.translateGrowthPhase(this.hass, 'growing'),
+            'Flowering Past': t.translateUI(this.hass, 'flowering_past'),
+            'Flowering To Go': t.translateUI(this.hass, 'flowering_to_go'),
+            'Harvested':      t.translateGrowthPhase(this.hass, 'harvested'),
+        };
+        const daysWord = t.translateUI(this.hass, 'days');
+        const floweringLabel = t.translateGrowthPhase(this.hass, 'flowering');
 
         const series = Object.values(phaseDurations).filter(value => value > 0);
         const labels = Object.entries(phaseDurations)
             .filter(([, value]) => value > 0)
-            .map(([key]) => key);
+            .map(([key]) => labelMap[key] ?? key);
 
         const existingChart = this._charts.get('pie');
         if (existingChart) {
@@ -532,19 +587,19 @@ ${TranslationUtils.translateUI(this.hass, 'no_completed_phases')}
                 },
                 events: {
                     dataPointSelection: (event: unknown, chartContext: unknown, config: { selectedDataPoints: number[][]; dataPointIndex: number }) => {
-                        // Wenn das gleiche Segment nochmal geklickt wird oder außerhalb geklickt wird
-                        if (config.selectedDataPoints[0].length === 0 || 
-                            (this._selectedPhase === labels[config.dataPointIndex] && config.selectedDataPoints[0].length === 1)) {
-                            // Zurücksetzen auf Gesamtansicht ohne Chart neu zu laden
+                        // labels[] sind übersetzte Strings (Samen/Wurzeln/...). _phaseData
+                        // ist mit kanonischen phaseDurations-Keys (Seed/Rooting/...) gespeichert.
+                        // Reverse-Lookup via labelMap damit Click die richtige Phase trifft.
+                        const clickedLabel = labels[config.dataPointIndex];
+                        const canonicalKey = Object.entries(labelMap).find(([, v]) => v === clickedLabel)?.[0] ?? clickedLabel;
+                        if (config.selectedDataPoints[0].length === 0 ||
+                            (this._selectedPhase === canonicalKey && config.selectedDataPoints[0].length === 1)) {
                             this._updateConsumptionForPhase(plantName, null);
-                            // Nur die Selektion zurücksetzen, nicht das ganze Chart
                             config.selectedDataPoints[0] = [];
                             (chartContext as { w: { globals: { selectedDataPoints: number[][] } } }).w.globals.selectedDataPoints[0] = [];
                         } else {
-                            // Neue Phase wurde ausgewählt
-                            const selectedPhase = labels[config.dataPointIndex];
-                            this._selectedPhase = selectedPhase;
-                            this._updateConsumptionForPhase(plantName, selectedPhase);
+                            this._selectedPhase = canonicalKey;
+                            this._updateConsumptionForPhase(plantName, canonicalKey);
                         }
                     }
                 }
@@ -576,33 +631,24 @@ ${TranslationUtils.translateUI(this.hass, 'no_completed_phases')}
                 formatter: function(val: number, opts: { w: { globals: { series: number[]; labels: string[]; }; }; seriesIndex: number }) {
                     const days = opts.w.globals.series[opts.seriesIndex];
                     const label = opts.w.globals.labels[opts.seriesIndex];
-                    
-                    // Spezielles Label für "Blüte To Go"
-                    if (label === 'Blüte To Go') {
-                        const pastDays = series[labels.indexOf('Blüte Past')] || 0;
-                        // Nur wenn wir tatsächlich vergangene Blütetage haben, zeige das kombinierte Label
+                    const pastLabel = labelMap['Flowering Past'];
+                    const togoLabel = labelMap['Flowering To Go'];
+
+                    // Kombiniertes Blüte-Label, falls beide Past/ToGo existieren
+                    if (label === togoLabel) {
+                        const pastIdx = labels.indexOf(pastLabel);
+                        const pastDays = pastIdx >= 0 ? (series[pastIdx] || 0) : 0;
                         if (pastDays > 0) {
                             const totalDays = pastDays + days;
-                            return [
-                                'Blüte',
-                                `${pastDays}/${days}/${totalDays} Tage`
-                            ];
+                            return [floweringLabel, `${pastDays}/${days}/${totalDays} ${daysWord}`];
                         }
-                        // Sonst zeige nur die geplante Blütezeit
-                        return [
-                            'Blüte',
-                            `${days} Tage`
-                        ];
+                        return [floweringLabel, `${days} ${daysWord}`];
                     }
-                    // Kein Label für "Blüte Past"
-                    else if (label === 'Blüte Past') {
+                    // Kein Standalone-Label für "Past" — wird im "To Go" mit angezeigt
+                    if (label === pastLabel) {
                         return [''];
                     }
-                    // Standard Label für andere Phasen
-                    return [
-                        `${label}`,
-                        `${days} Tage`
-                    ];
+                    return [`${label}`, `${days} ${daysWord}`];
                 }
             },
             tooltip: {
@@ -613,7 +659,7 @@ ${TranslationUtils.translateUI(this.hass, 'no_completed_phases')}
                 },
                 y: {
                     formatter: function(value: number) {
-                        return `${value} Tage`;
+                        return `${value} ${daysWord}`;
                     }
                 }
             },
@@ -642,31 +688,38 @@ ${TranslationUtils.translateUI(this.hass, 'no_completed_phases')}
             }
         };
 
-        // Speichere die Phaseninformationen
+        // Speichere die Phaseninformationen mit Keys die zu phaseDurations passen,
+        // damit der Click-Handler über _phaseData.get(canonicalKey) trifft.
         if (growthPhaseEntity) {
-            const phases = ['samen', 'keimen', 'wurzeln', 'wachstum', 'blüte', 'geerntet'];
-            
+            const phases = ['seeds', 'germination', 'rooting', 'growing', 'flowering', 'harvested'];
+            // Mapping zu phaseDurations-Keys (Singular bzw. abweichende Schreibung)
+            const canonicalPhaseKey: Record<string, string> = {
+                'seeds': 'Seed',
+                'germination': 'Germination',
+                'rooting': 'Rooting',
+                'growing': 'Growth',
+                'flowering': 'Flowering',
+                'harvested': 'Harvested',
+            };
+
             phases.forEach((phase, index) => {
-                const startDate = growthPhaseEntity.attributes[`${phase}_beginn`];
+                const startDate = growthPhaseEntity.attributes[`${phase}_start`];
                 if (startDate) {
                     const start = new Date(startDate);
                     let end: Date | null = null;
-                    
-                    // Finde das Ende der Phase
+
                     if (index < phases.length - 1) {
                         const nextPhase = phases[index + 1];
-                        const nextStart = growthPhaseEntity.attributes[`${nextPhase}_beginn`];
+                        const nextStart = growthPhaseEntity.attributes[`${nextPhase}_start`];
                         if (nextStart) {
                             end = new Date(nextStart);
                         }
                     }
-                    
-                    // Wenn es kein Ende gibt und es die aktuelle Phase ist, setze das Ende auf jetzt
                     if (!end && growthPhaseEntity.state === phase) {
                         end = new Date();
                     }
 
-                    this._phaseData.set(phase.charAt(0).toUpperCase() + phase.slice(1), {
+                    this._phaseData.set(canonicalPhaseKey[phase], {
                         start,
                         end,
                         duration: end ? Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) : 0
@@ -674,28 +727,40 @@ ${TranslationUtils.translateUI(this.hass, 'no_completed_phases')}
                 }
             });
 
-            // Speichere auch die Blütephaseninformationen
-            if (growthPhaseEntity.attributes.blüte_beginn) {
-                const blueteStart = new Date(growthPhaseEntity.attributes.blüte_beginn);
-                const now = new Date();
-                this._phaseData.set('Blüte Past', {
+            // Blüte-Past / To-Go als kanonische Keys (passend zu phaseDurations)
+            const now = new Date();
+            const floweringDurationEntityId = this._plantInfo?.helpers?.flowering_duration?.entity_id;
+            const floweringDurationEntity = floweringDurationEntityId ? this.hass?.states[floweringDurationEntityId] : undefined;
+            const totalDuration = floweringDurationEntity?.state ? parseInt(floweringDurationEntity.state) : 0;
+
+            if (growthPhaseEntity.attributes.flowering_start) {
+                const blueteStart = new Date(growthPhaseEntity.attributes.flowering_start);
+                this._phaseData.set('Flowering Past', {
                     start: blueteStart,
                     end: now,
                     duration: Math.floor((now.getTime() - blueteStart.getTime()) / (1000 * 60 * 60 * 24))
                 });
-                
-                const floweringDurationEntity = this.hass?.states[`number.${plantName}_flowering_duration`];
-                if (floweringDurationEntity?.state) {
-                    const totalDuration = parseInt(floweringDurationEntity.state);
+
+                if (totalDuration > 0) {
                     const endDate = new Date(blueteStart);
                     endDate.setDate(endDate.getDate() + totalDuration);
-                    
-                    this._phaseData.set('Blüte To Go', {
+                    this._phaseData.set('Flowering To Go', {
                         start: now,
                         end: endDate,
                         duration: Math.floor((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
                     });
                 }
+            } else if (totalDuration > 0) {
+                // Blüte noch nicht begonnen — geplante Blüte als To-Go-Segment ab jetzt.
+                // Sonst läuft der Klick auf "Restliche Blüte" ins Leere weil
+                // _phaseData den Key nicht hat.
+                const endDate = new Date(now);
+                endDate.setDate(endDate.getDate() + totalDuration);
+                this._phaseData.set('Flowering To Go', {
+                    start: now,
+                    end: endDate,
+                    duration: totalDuration
+                });
             }
         }
 
@@ -726,24 +791,31 @@ ${TranslationUtils.translateUI(this.hass, 'no_completed_phases')}
 
     updated(changedProps: Map<string, unknown>) {
         super.updated(changedProps);
-        
+
         if (this.entityId && this.hass) {
             const plantName = this.entityId.split('.')[1];
-            
-            // Initialisiere den Chart, wenn sich die entityId ändert oder wenn die Komponente zum ersten Mal geladen wird
-            if (changedProps.has('entityId') || changedProps.has('hass')) {
+
+            if (changedProps.has('entityId') && this.entityId) {
                 // Zerstöre alle vorhandenen Charts, wenn sich die entityId ändert
-                if (changedProps.has('entityId')) {
-                    this._charts.forEach((chart) => {
-                        chart.destroy();
-                    });
-                    this._charts.clear();
-                    
-                    // Zurücksetzen der Daten
-                    this._lastPhaseData.clear();
-                }
-                
-                // Chart initialisieren oder aktualisieren
+                this._charts.forEach((chart) => {
+                    chart.destroy();
+                });
+                this._charts.clear();
+
+                // Zurücksetzen der Daten
+                this._lastPhaseData.clear();
+
+                // Plant-Info nachladen wenn entityId wechselt — entity_ids der Helper kommen
+                // sprachneutral aus plant/get_info (statt hartkodierter Patterns). _initPieChart
+                // erst NACH dem Laden aufrufen (statt im selben Zyklus, unabgewartet) — sonst ist
+                // _plantInfo noch leer, der Chart-Init bricht früh ab und wartet bis zum nächsten
+                // zufälligen hass-Update irgendeiner anderen Entity, um erneut zu versuchen.
+                this._loadPlantInfo(this.entityId).then(() => this._initPieChart(plantName));
+                return;
+            }
+
+            // Chart aktualisieren, wenn sich hass ändert (Daten sind bereits geladen)
+            if (changedProps.has('hass')) {
                 this._initPieChart(plantName);
             }
         }

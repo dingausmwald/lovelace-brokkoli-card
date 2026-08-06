@@ -100,7 +100,6 @@
           "rooting_duration": "Czas Ukorzeniania",
           "growth_duration": "Czas Wzrostu",
           "flower_duration": "Czas Kwitnienia",
-          "flowering_duration": "Czas Kwitnienia",
           "harvested_duration": "Czas Zbioru",
           "removed_duration": "Czas Usunięcia"
         },
@@ -122,10 +121,10 @@
           "energy_cost": "Koszt Energii"
         },
         "growth_phases": {
-          "seed": "Nasiono",
+          "seeds": "Nasiono",
           "germination": "Kiełkowanie",
           "rooting": "Ukorzenianie",
-          "growth": "Wzrost",
+          "growing": "Wzrost",
           "flowering": "Kwitnienie",
           "harvested": "Zebrane",
           "removed": "Usunięte"
@@ -217,5 +216,16 @@
         }
       }
     }
+  },
+  "frontend": {
+    "ui": {
+      "legend_rings_mode_active": "Tryb: Pierścienie (kliknij, aby przełączyć)",
+      "legend_labels_mode_active": "Tryb: Etykiety (kliknij, aby przełączyć)",
+      "legend_heatmap_mode_active": "Tryb: Mapa cieplna (kliknij, aby przełączyć)",
+      "flowering_past": "Kwitnienie minęło",
+      "flowering_to_go": "Kwitnienie pozostało",
+      "days": "Dni"
+    },
+    "sensors": {}
   }
-} 
+}
