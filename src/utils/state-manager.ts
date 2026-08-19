@@ -36,6 +36,29 @@ export class StateManager {
         this.state = this.getInitialState();
     }
 
+    /**
+     * Seed the active filters from `filter.filters` in the card config.
+     *
+     * The YAML shape differs from the runtime one: value lists are plain
+     * arrays there and Sets here, while sensor ranges are the same object
+     * either way. Columns with an empty list are dropped, because an empty
+     * Set would match nothing and hide every row.
+     */
+    private getConfiguredFilters(): FilterState['activeFilters'] {
+        const configured = this.config?.filter?.filters;
+        if (!configured) return {};
+
+        const active: FilterState['activeFilters'] = {};
+        for (const [column, value] of Object.entries(configured)) {
+            if (Array.isArray(value)) {
+                if (value.length > 0) active[column] = new Set(value);
+            } else if (value && typeof value === 'object') {
+                active[column] = value;
+            }
+        }
+        return active;
+    }
+
     private getInitialState(): FlowerListState {
         return {
             sortColumn: 'friendly_name',
@@ -46,7 +69,7 @@ export class StateManager {
             selectedPlants: new Set(),
             filterMode: false,
             filterState: {
-                activeFilters: {},
+                activeFilters: this.getConfiguredFilters(),
                 entityTypes: new Set(['plant', 'cycle'])
             },
             showGallery: false,
