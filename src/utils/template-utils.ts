@@ -16,10 +16,15 @@ export interface TemplateOptions {
 
 export class TemplateUtils {
     static renderDateInput(value: string | undefined, options: TemplateOptions): HTMLTemplateResult {
+        // Die Integration speichert Phasendaten als "%Y-%m-%d %H:%M:%S", also mit
+        // Leerzeichen statt ISO-T. Nur auf 'T' zu trennen liess den Zeitanteil
+        // stehen, und ein input[type=date] akzeptiert ausschliesslich
+        // yyyy-MM-dd -- das Feld blieb leer, Loeschen und Enter bewirkten
+        // nichts, weil sich der Wert nie aenderte. Auf beide Trenner splitten.
         return html`
             <input
                 type="date"
-                .value="${value?.split('T')[0] || ''}"
+                .value="${value?.split(/[T ]/)[0] || ''}"
                 @change=${(e: Event) => options.onInput(e, 'date')}
                 @click=${(e: Event) => e.stopPropagation()}
                 class="date-input"
