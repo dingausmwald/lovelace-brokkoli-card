@@ -220,6 +220,18 @@ export class SensorAssignment extends LitElement {
     // click — ohne diese Sperre würde das die Typ-Auswahl mit umschalten.
     private _dragEndedAt = 0;
 
+    // Stammdaten unter dem Namen. Wie in der Area-Card: beide an ergibt
+    // "Strain - Breeder" in einer Zeile, nur eines davon ohne Trennstrich.
+    @state() private _showStrain = false;
+    @state() private _showBreeder = false;
+
+    private _strainLine(plant: PlantDeviceInfo): string {
+        const parts: string[] = [];
+        if (this._showStrain && plant.strain) parts.push(plant.strain);
+        if (this._showBreeder && plant.breeder) parts.push(plant.breeder);
+        return parts.join(' - ');
+    }
+
     private get _view(): SensorAssignmentView {
         return this._viewOverride ?? this.defaultView;
     }
@@ -1361,6 +1373,9 @@ export class SensorAssignment extends LitElement {
                     </div>
 
                     <div class="sa-flower-name" title="${plant.name}">${plant.name}</div>
+                    ${this._strainLine(plant)
+                        ? html`<div class="sa-flower-strain" title="${this._strainLine(plant)}">${this._strainLine(plant)}</div>`
+                        : ''}
 
                     ${open.map(slot => html`
                         <div
@@ -1438,6 +1453,9 @@ export class SensorAssignment extends LitElement {
                         ${!plant.picture ? html`<ha-icon icon="mdi:sprout"></ha-icon>` : ''}
                     </div>
                     <div class="sa-row-name" title="${plant.name}">${plant.name}</div>
+                    ${this._strainLine(plant)
+                        ? html`<div class="sa-row-strain" title="${this._strainLine(plant)}">${this._strainLine(plant)}</div>`
+                        : ''}
                 </div>
 
                 <div class="sa-row-groups">
@@ -1584,6 +1602,22 @@ export class SensorAssignment extends LitElement {
                                 @click="${() => { this._viewOverride = 'list'; }}"
                             >
                                 <ha-icon icon="mdi:format-list-bulleted"></ha-icon>
+                            </button>
+                        </div>
+                        <div class="sa-view-switch">
+                            <button
+                                class="${this._showStrain ? 'sa-view-on' : ''}"
+                                title="Strain anzeigen"
+                                @click="${() => { this._showStrain = !this._showStrain; }}"
+                            >
+                                <ha-icon icon="mdi:dna"></ha-icon>
+                            </button>
+                            <button
+                                class="${this._showBreeder ? 'sa-view-on' : ''}"
+                                title="Breeder anzeigen"
+                                @click="${() => { this._showBreeder = !this._showBreeder; }}"
+                            >
+                                <ha-icon icon="mdi:account-tie"></ha-icon>
                             </button>
                         </div>
                     </div>

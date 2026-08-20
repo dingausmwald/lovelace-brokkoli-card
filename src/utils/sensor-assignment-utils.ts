@@ -25,43 +25,48 @@ export interface SensorTypeDef {
 // Pflanze zuweisen. Ebenso wird humidity nicht mehr zusätzlich auf moisture
 // gemappt: sonst hätte ein Luftfeuchte-Sensor beim Ablegen stillschweigend auch
 // die Bodenfeuchte überschrieben.
+// Erkennung: device_class ODER Einheit, bewusst nicht "device_class schlaegt
+// Einheit". Viele Bodenfeuchte-Sensoren melden device_class "humidity" statt
+// "moisture" -- mit einem Vorrang der device_class waren sie als Bodenfeuchte
+// nicht mehr zuweisbar. In einer Zuweisungs-Card ist zu viel anbieten harmlos,
+// zu wenig anbieten blockiert. Prozentwerte matchen deshalb beide Typen.
 export const SENSOR_TYPES: SensorTypeDef[] = [
     {
         key: 'temperature',
         icon: 'mdi:thermometer',
-        matches: (dc, u) => (dc ? dc === 'temperature' : u === '°C' || u === '°F'),
+        matches: (dc, u) => dc === 'temperature' || u === '°C' || u === '°F',
     },
     {
         key: 'moisture',
         icon: 'mdi:water-percent',
-        matches: (dc, u) => (dc ? dc === 'moisture' : u === '%'),
+        matches: (dc, u) => dc === 'moisture' || u === '%',
     },
     {
         key: 'illuminance',
         icon: 'mdi:brightness-5',
-        matches: (dc, u) => (dc ? dc === 'illuminance' : u === 'lx' || u === 'lm'),
+        matches: (dc, u) => dc === 'illuminance' || u === 'lx' || u === 'lm',
     },
     {
         key: 'humidity',
         icon: 'mdi:water',
-        matches: (dc, u) => (dc ? dc === 'humidity' : u === '%'),
+        matches: (dc, u) => dc === 'humidity' || u === '%',
     },
     {
         key: 'conductivity',
         icon: 'mdi:flash',
         // HA normalisiert das Mikro-Zeichen nicht — sowohl U+00B5 (Mikro) als
         // auch U+03BC (griechisches My) kommen in echten Konfigurationen vor.
-        matches: (dc, u) => (dc ? dc === 'conductivity' : u === 'µS/cm' || u === 'μS/cm' || u === 'mS/cm'),
+        matches: (dc, u) => dc === 'conductivity' || u === 'µS/cm' || u === 'μS/cm' || u === 'mS/cm',
     },
     {
         key: 'power_consumption',
         icon: 'mdi:power-plug',
-        matches: (dc, u) => (dc ? dc === 'power' || dc === 'energy' : u === 'W' || u === 'kW' || u === 'kWh' || u === 'Wh'),
+        matches: (dc, u) => dc === 'power' || dc === 'energy' || u === 'W' || u === 'kW' || u === 'kWh' || u === 'Wh',
     },
     {
         key: 'ph',
         icon: 'mdi:ph',
-        matches: (dc, u) => (dc ? dc === 'ph' : u === 'pH'),
+        matches: (dc, u) => dc === 'ph' || u === 'pH',
     },
 ];
 
@@ -117,6 +122,8 @@ export interface PlantDeviceInfo {
     deviceId?: string;
     name: string;
     picture?: string;
+    strain?: string;
+    breeder?: string;
 }
 
 export class SensorAssignmentUtils {
@@ -214,6 +221,8 @@ export class SensorAssignmentUtils {
                     deviceId: registryEntry?.device_id,
                     name: entity.attributes?.friendly_name || entity.entity_id,
                     picture: entity.attributes?.entity_picture,
+                    strain: entity.attributes?.strain as string | undefined,
+                    breeder: entity.attributes?.breeder as string | undefined,
                 };
             })
             .sort((a, b) => a.name.localeCompare(b.name));

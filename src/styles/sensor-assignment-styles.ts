@@ -727,6 +727,39 @@ export const sensorAssignmentStyles = css`
     pointer-events: none;
   }
 
+  /* Stammdaten unter dem Namen. Bewusst NICHT fett -- der Name ist es hier
+     auch nicht, anders als in der Area-Card. */
+  .sa-flower-strain {
+    position: absolute;
+    left: 50%;
+    top: calc(50% + 45px);
+    transform: translateX(-50%);
+    z-index: 5;
+    max-width: 170px;
+    padding: 1px 7px;
+    border-radius: 10px;
+    background-color: var(--ha-card-background, var(--card-background-color, #fff));
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
+    opacity: 0.92;
+    font-size: 0.8em;
+    text-align: center;
+    color: var(--primary-text-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .sa-row-strain {
+    font-size: 0.78em;
+    text-align: center;
+    color: var(--primary-text-color);
+    max-width: 96px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   /* --- Listenansicht ------------------------------------------------------
      Pflanze links, darunter ihr Name; rechts je Sensortyp eine Zeile. Typen
      derselben Quelle stehen zusammen und laufen über geschwungene Verbinder
