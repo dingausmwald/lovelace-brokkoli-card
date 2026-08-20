@@ -74,10 +74,19 @@ export class PlantFlyoutMenu extends LitElement {
     }));
   }
 
+  /** First free name of the form "<source> <n>". */
+  private _nextCloneName(base: string): string {
+    const taken = new Set(this._plants.map(p => p.attributes.friendly_name));
+    let n = 1;
+    while (taken.has(`${base} ${n}`)) n++;
+    return `${base} ${n}`;
+  }
+
   private _handleClonePlant(plant: HomeAssistantEntity) {
     this._selectedPlantForClone = plant;
+    const base = String(plant.attributes.friendly_name || plant.entity_id);
     this._cloneData = {
-      name: `Clone of ${plant.attributes.friendly_name || plant.entity_id}`,
+      name: this._nextCloneName(base),
       temperature_sensor: '',
       moisture_sensor: '',
       conductivity_sensor: '',
