@@ -34,8 +34,16 @@ export class TranslationUtils {
     }
 
     private static getTranslation(hass: HomeAssistant, key: string): string {
-        const bundle = this.getBundle(this.getLanguage(hass));
-        return this.getTranslationFromObject(bundle, key);
+        const language = this.getLanguage(hass);
+        const translated = this.getTranslationFromObject(this.getBundle(language), key);
+        if (translated !== key) return translated;
+
+        // getBundle only falls back when a whole language file is absent. Most
+        // of them are partial -- es/fr/it/... carry no `frontend.fields` at all
+        // -- which used to surface the raw key in the UI. Fall back per key so
+        // an untranslated label reads English instead of "frontend.fields.x".
+        if (language === 'en') return translated;
+        return this.getTranslationFromObject(this.getBundle('en'), key);
     }
 
     private static getTranslationFromObject(translations: TranslationObject, key: string): string {
