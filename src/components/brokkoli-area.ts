@@ -215,6 +215,12 @@ export class BrokkoliArea extends LitElement {
   // config_entry_id. Vermeidet das Erraten der Helper-Entity-ID aus
   // dem Plant-Slug — das ist fehleranfällig bei Strain-Namen mit
   // Ziffern (z.B. "AK-47" → "ak_47").
+  //
+  // Gematcht wird über translation_key, nicht über das entity_id-Suffix:
+  // dessen Wortlaut stammt aus der UI-Sprache beim Anlegen, auf einer
+  // deutschen Instanz heißt der Helper "..._standort". Ein Suffix-Match
+  // findet ihn dort nie, die Karte hält jede Pflanze für positionslos und
+  // verteilt sie neu — eine verschobene Pflanze springt dann zurück.
   private _findLocationEntity(plantEntityId: string) {
     if (!this.hass) return null;
     const plantEntity = this.hass.entities?.[plantEntityId];
@@ -224,7 +230,7 @@ export class BrokkoliArea extends LitElement {
       if (
         e.device_id === deviceId
         && e.entity_id.startsWith('text.')
-        && e.entity_id.endsWith('_location')
+        && (e as { translation_key?: string }).translation_key === 'location'
       ) {
         return this.hass.states[e.entity_id] ?? null;
       }
