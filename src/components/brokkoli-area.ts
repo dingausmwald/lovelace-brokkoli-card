@@ -177,6 +177,15 @@ export class BrokkoliArea extends LitElement {
     if (changedProps.has('_showAddPlantDialog')) {
       this._handleDialogStateChange();
     }
+
+    // Flyout-Handling, analog zum Dialog
+    if (changedProps.has('_showPlantFlyout') || changedProps.has('_flyoutPosition')) {
+      if (this._showPlantFlyout && this.hass) {
+        this._createFlyout();
+      } else {
+        this._removeFlyout();
+      }
+    }
   }
   
   // Behandelt Größenänderungen des Containers
@@ -194,6 +203,9 @@ export class BrokkoliArea extends LitElement {
   // Wird aufgerufen, wenn die Komponente entfernt wird
   disconnectedCallback() {
     super.disconnectedCallback();
+    // Am body haengende Overlays mitnehmen, sonst bleiben sie stehen
+    this._removeFlyout();
+    this._removeDialog();
     
     // Event-Listener entfernen
     window.removeEventListener('resize', this._handleResize);
@@ -1522,24 +1534,12 @@ export class BrokkoliArea extends LitElement {
     // Dialog-Handling wird jetzt in updated() gemacht, nicht im render()
     // Das verhindert mehrfache Dialog-Erstellung bei Re-Renders
     
-    // Flyout-Menu rendern
-    const flyoutTemplate = this._showPlantFlyout ? html`
-      <plant-flyout-menu
-        .hass=${this.hass}
-        .position=${this._flyoutPosition}
-        .targetPosition=${this._newPlantPosition}
-        .areaId=${this.areaId}
-        .isMobile=${window.innerWidth <= 768}
-        @new-plant-requested=${this._handleNewPlantRequested}
-        @move-plant-requested=${this._handleMovePlantRequested}
-        @plant-cloned=${this._handlePlantCloned}
-        @menu-closed=${this._handleMenuClosed}
-      ></plant-flyout-menu>
-    ` : '';
-    
+    // Das Flyout-Menü wird nicht hier gerendert, sondern wie der
+    // Erstellen-Dialog an document.body gehängt (siehe _createFlyout).
+    // z-index wirkt nur innerhalb des eigenen Stacking-Kontexts: im Shadow-DOM
+    // der Karte liegt es zwangsläufig unter später folgenden Nachbarkarten.
     return html`
       ${mainTemplate}
-      ${flyoutTemplate}
     `;
   }
   
@@ -2145,6 +2145,47 @@ export class BrokkoliArea extends LitElement {
     const existingContainer = document.getElementById('plant-dialog-container');
     if (existingContainer && document.body.contains(existingContainer)) {
       document.body.removeChild(existingContainer);
+    }
+  }
+
+  // Hängt das Flyout-Menü an document.body, damit es über Nachbarkarten liegt
+  private _createFlyout() {
+    this._removeFlyout();
+
+    const container = document.createElement('div');
+    container.id = 'plant-flyout-container';
+    container.style.cssText =
+      'position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 10000; pointer-events: none;';
+
+    const menu = document.createElement('plant-flyout-menu');
+    document.body.appendChild(container);
+    container.appendChild(menu);
+
+    const el = menu as unknown as {
+      hass: HomeAssistant;
+      position: Position;
+      targetPosition: Position;
+      areaId: string;
+      isMobile: boolean;
+    };
+    el.hass = this.hass;
+    el.position = this._flyoutPosition;
+    el.targetPosition = this._newPlantPosition;
+    el.areaId = this.areaId || '';
+    el.isMobile = window.innerWidth <= 768;
+
+    // Als addEventListener-Callback geht das this verloren, das Lit bei
+    // @event-Bindings im Template mitliefert -- deshalb explizit binden.
+    menu.addEventListener('new-plant-requested', this._handleNewPlantRequested.bind(this) as EventListener);
+    menu.addEventListener('move-plant-requested', this._handleMovePlantRequested.bind(this) as EventListener);
+    menu.addEventListener('plant-cloned', this._handlePlantCloned.bind(this) as EventListener);
+    menu.addEventListener('menu-closed', this._handleMenuClosed.bind(this) as EventListener);
+  }
+
+  private _removeFlyout() {
+    const existing = document.getElementById('plant-flyout-container');
+    if (existing && document.body.contains(existing)) {
+      document.body.removeChild(existing);
     }
   }
 
