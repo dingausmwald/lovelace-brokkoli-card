@@ -84,8 +84,18 @@ export class CellRenderer {
 
         if (CellTypeUtils.isNumberInput(columnId)) {
             const entityId = getEntityFromSensorMap(columnId);
-            if (!entityId) return html`<span>Sensor map missing</span>`;
-            
+            if (!entityId) {
+                // Attributgestuetztes Feld wie original_flowering_duration: dafuer
+                // gibt es keine eigene Entity. Der Speicherweg faellt in dem Fall
+                // ohnehin auf die Pflanzen-Entity zurueck (siehe event-utils), also
+                // hier genauso lesen statt die Eingabe zu verweigern.
+                return TemplateUtils.renderNumberInput(
+                    plant.attributes[columnId],
+                    this.getNumberInputUnit(columnId, undefined, hass),
+                    templateOptions
+                );
+            }
+
             const entity = hass?.states[entityId];
             const unit = this.getNumberInputUnit(columnId, entity, hass);
             return TemplateUtils.renderNumberInput(entity?.state, unit, templateOptions);
@@ -198,7 +208,7 @@ export class CellRenderer {
     }
 
     private static getNumberInputUnit(columnId: string, entity?: { attributes: { unit_of_measurement?: string } }, hass?: HomeAssistant): string {
-        return columnId === 'flowering_duration' ? (hass ? TranslationUtils.translateUI(hass, 'days') : 'days') : 
+        return (columnId === 'flowering_duration' || columnId === 'original_flowering_duration') ? (hass ? TranslationUtils.translateUI(hass, 'days') : 'days') : 
                columnId === 'pot_size' ? 'L' : 
                entity?.attributes.unit_of_measurement || '';
     }
