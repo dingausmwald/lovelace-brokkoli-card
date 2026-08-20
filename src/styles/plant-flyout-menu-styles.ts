@@ -361,5 +361,11 @@ export const plantFlyoutMenuStyles = css`
     bottom: 0;
     background: rgba(0, 0, 0, 0.5);
     z-index: 1001;
+    /* Der Host ist pointer-events:none, damit er als bildschirmfuellendes
+       Overlay nicht alles schluckt. Jedes bedienbare Element darunter muss
+       sich das Zeigerverhalten daher selbst zurueckholen -- ohne diese Zeile
+       ist der Klon-Dialog unbedienbar und der Klick landet auf dem Overlay
+       dahinter, das das Menue schliesst. */
+    pointer-events: auto;
   }
 `; 
