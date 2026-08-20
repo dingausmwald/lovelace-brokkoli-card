@@ -283,6 +283,7 @@ export const positionStyles: CSSResult = css`
     top: calc(95%);
     transform: translateX(-50%);
     font-size: 0.8rem;
+    font-weight: bold;
     max-width: 120%;
     overflow: hidden;
     text-overflow: ellipsis;
