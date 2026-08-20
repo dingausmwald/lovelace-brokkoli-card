@@ -306,13 +306,14 @@ export const positionStyles: CSSResult = css`
     left: 50%;
     top: calc(95%);
     transform: translateX(-50%);
-    font-size: 0.7rem;
+    font-size: 0.8rem;
+    font-weight: bold;
     max-width: 140%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     text-align: center;
-    color: var(--secondary-text-color);
+    color: var(--primary-text-color);
     background-color: var(--card-background-color, #fff);
     padding: 1px 5px;
     border-radius: 10px;
@@ -324,7 +325,7 @@ export const positionStyles: CSSResult = css`
   }
 
   .entity-name.shifted {
-    top: calc(95% - 18px);
+    top: calc(95% - 26px);
   }
 
   .entity-strain.dragging,
