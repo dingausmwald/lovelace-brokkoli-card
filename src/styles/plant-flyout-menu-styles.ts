@@ -1,6 +1,17 @@
 import { css } from 'lit';
 
 export const plantFlyoutMenuStyles = css`
+  /* Das Menü wird als Geschwister des Card-Containers gerendert, und der Host
+     der Area ist ein Flex-Container. Ohne eigene Positionierung wäre dieses
+     Element ein Flex-Kind und erschiene unterhalb der Karte, obwohl seine
+     Innereien mit position:fixed auf den Viewport ausgelegt sind. */
+  :host {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    pointer-events: none;
+  }
+
   .flyout-overlay {
     position: absolute;
     top: 0;

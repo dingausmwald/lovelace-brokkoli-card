@@ -1,4 +1,4 @@
-import { CSSResult, HTMLTemplateResult, LitElement, html, css } from 'lit';
+import { CSSResult, HTMLTemplateResult, LitElement, html, css, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { HomeAssistant, LovelaceCardEditor } from 'custom-card-helpers';
 import { positionStyles } from './styles/area-styles';
@@ -34,6 +34,11 @@ export interface BrokkoliAreaCardConfig {
   heatmap_secondary_color?: string; // Optionale benutzerdefinierte sekundäre Farbe (Standard: weiß)
   heatmap_opacity?: number; // Optionale benutzerdefinierte Opacity für die Heatmap (Standard: 0.8)
   legend?: boolean; // Ob die Legende angezeigt werden soll (Standard: true)
+  // Explizite Maße. grid_options greift nur im Sections-Layout; im
+  // Masonry-Layout bleibt die Karte sonst auf Spaltenbreite und wirkt schmal.
+  // Zahl = Pixel, String = beliebige CSS-Länge (z.B. "60vh", "800px").
+  height?: number | string;
+  width?: number | string;
 }
 
 // Registriere die Karte
@@ -162,8 +167,15 @@ export default class BrokkoliAreaCard extends LitElement {
     // Filtere ungültige Entitäten
     const validEntities = entities.filter(entityId => this._hass!.states[entityId]);
 
+    const asLength = (v: number | string | undefined): string | null =>
+      v === undefined || v === null ? null : (typeof v === 'number' ? `${v}px` : v);
+    const cardStyle = [
+      asLength(this.config.height) ? `height:${asLength(this.config.height)}` : '',
+      asLength(this.config.width) ? `width:${asLength(this.config.width)}` : '',
+    ].filter(Boolean).join(';');
+
     return html`
-      <ha-card>
+      <ha-card style=${cardStyle || nothing}>
         ${this.config.title ? html`<h1 class="card-header">${this.config.title}</h1>` : ''}
         <div class="card-content no-padding">
           <brokkoli-area
@@ -185,6 +197,14 @@ export default class BrokkoliAreaCard extends LitElement {
 
   // Gibt die Größe der Karte zurück
   getCardSize(): number {
+    // Masonry rechnet in Einheiten von rund 50px. Ohne explizite Höhe bleibt
+    // es beim bisherigen Standard.
+    const h = this.config?.height;
+    if (typeof h === 'number') return Math.max(1, Math.round(h / 50));
+    if (typeof h === 'string') {
+      const px = /^(\d+(?:\.\d+)?)px$/.exec(h.trim());
+      if (px) return Math.max(1, Math.round(parseFloat(px[1]) / 50));
+    }
     return 3;
   }
 

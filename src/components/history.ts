@@ -827,13 +827,13 @@ export class FlowerHistory extends LitElement {
                             @change=${handleSelectChange}
                         >
                             <option value="" disabled selected>${TranslationUtils.translateHistory(this.hass!, 'please_select')}</option>
-                            <option value="seed">${TranslationUtils.translateGrowthPhase(this.hass!, 'seed')}</option>
+                            <option value="seeds">${TranslationUtils.translateGrowthPhase(this.hass!, 'seeds')}</option>
                             <option value="germination">${TranslationUtils.translateGrowthPhase(this.hass!, 'germination')}</option>
                             <option value="rooting">${TranslationUtils.translateGrowthPhase(this.hass!, 'rooting')}</option>
-                            <option value="growth">${TranslationUtils.translateGrowthPhase(this.hass!, 'growth')}</option>
+                            <option value="growing">${TranslationUtils.translateGrowthPhase(this.hass!, 'growing')}</option>
                             <option value="flowering">${TranslationUtils.translateGrowthPhase(this.hass!, 'flowering')}</option>
-                            <option value="removed">${TranslationUtils.translateGrowthPhase(this.hass!, 'removed')}</option>
                             <option value="harvested">${TranslationUtils.translateGrowthPhase(this.hass!, 'harvested')}</option>
+                            <option value="removed">${TranslationUtils.translateGrowthPhase(this.hass!, 'removed')}</option>
                         </select>
                     </div>
                 `;
