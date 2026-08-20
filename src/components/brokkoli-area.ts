@@ -2158,9 +2158,10 @@ export class BrokkoliArea extends LitElement {
       'position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 10000; pointer-events: none;';
 
     const menu = document.createElement('plant-flyout-menu');
-    document.body.appendChild(container);
-    container.appendChild(menu);
 
+    // Eigenschaften VOR dem Einhängen setzen: connectedCallback() des Menüs
+    // lädt die Pflanzenliste und bricht ohne hass wortlos ab, ohne es später
+    // erneut zu versuchen. Angehängt vor der Zuweisung bliebe die Liste leer.
     const el = menu as unknown as {
       hass: HomeAssistant;
       position: Position;
@@ -2173,6 +2174,9 @@ export class BrokkoliArea extends LitElement {
     el.targetPosition = this._newPlantPosition;
     el.areaId = this.areaId || '';
     el.isMobile = window.innerWidth <= 768;
+
+    container.appendChild(menu);
+    document.body.appendChild(container);
 
     // Als addEventListener-Callback geht das this verloren, das Lit bei
     // @event-Bindings im Template mitliefert -- deshalb explizit binden.
