@@ -93,9 +93,16 @@ export class PlantFlyoutMenu extends LitElement {
     if (!this.hass || !this._selectedPlantForClone) return;
 
     try {
+      // Nicht gesetzte Sensorfelder sind leere Strings und damit keine
+      // gueltigen Entity-IDs -- das Service-Schema lehnt den ganzen Aufruf ab
+      // ("Entity ID is an invalid entity ID for dictionary value").
+      const angaben = Object.fromEntries(
+        Object.entries(this._cloneData).filter(([, v]) => v !== '' && v != null)
+      );
+
       await this.hass.callService('plant', 'clone_plant', {
         source_entity_id: this._selectedPlantForClone.entity_id,
-        ...this._cloneData
+        ...angaben
       });
 
       this.dispatchEvent(new CustomEvent('plant-cloned', {
@@ -224,7 +231,7 @@ export class PlantFlyoutMenu extends LitElement {
 
   private _renderCloneDialog() {
     return html`
-      <div class="plant-clone-dialog-backdrop" @click=${this._handleOverlayClick}>
+      <div class="plant-clone-dialog-backdrop" @click=${(e: Event) => e.stopPropagation()}>
         <div class="plant-clone-dialog" @click=${(e: Event) => e.stopPropagation()}>
           <div class="plant-clone-dialog-header">
             <h2 class="plant-clone-dialog-title">Pflanze klonen</h2>
