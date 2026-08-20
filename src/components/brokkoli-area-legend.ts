@@ -33,6 +33,10 @@ export interface LegendSettings {
   heatmapOpacity?: number;
 }
 
+// Stammdaten, die es nur als Label gibt -- als Ring ergeben sie keinen Sinn.
+// Stehen bewusst vor den Sensoren, also direkt hinter dem Menü-Knopf.
+const LABEL_ONLY_IDS = ['strain', 'breeder'];
+
 // Liste der verfügbaren Sensoren für die Legende (IDs - Namen werden dynamisch übersetzt)
 const AVAILABLE_SENSOR_IDS = [
   'temperature',
@@ -124,6 +128,8 @@ export class BrokkoliAreaLegend extends LitElement {
   private _getIconForSensor(sensorId: string): string {
     // Fallback-Icons für den Fall, dass keine dynamischen Icons verfügbar sind
     const fallbackIcons: Record<string, string> = {
+      'strain': 'mdi:dna',
+      'breeder': 'mdi:account-tie',
       'temperature': 'mdi:thermometer',
       'moisture': 'mdi:water-percent',
       'conductivity': 'mdi:flash',
@@ -137,6 +143,11 @@ export class BrokkoliAreaLegend extends LitElement {
       'ph': 'mdi:ph'
     };
     
+    // Stammdaten kommen nicht aus plant/get_info, also gar nicht erst dort suchen
+    if (LABEL_ONLY_IDS.includes(sensorId)) {
+      return fallbackIcons[sensorId];
+    }
+
     // Wenn PlantInfo verfügbar ist, versuche das Icon von dort zu bekommen
     if (this.plantInfo?.result && this.plantInfo.result[sensorId]?.icon) {
       return this.plantInfo.result[sensorId].icon;
@@ -166,6 +177,21 @@ export class BrokkoliAreaLegend extends LitElement {
     }));
   }
   
+  // Auswahl für den Labels-Reiter: Stammdaten zuerst, dann die Sensoren.
+  // Übersetzt über translateField, weil strain/breeder unter frontend.fields
+  // liegen und nicht unter frontend.sensors.
+  private _getAvailableLabels() {
+    if (!this.hass) return [];
+
+    return [
+      ...LABEL_ONLY_IDS.map(id => ({
+        id,
+        name: TranslationUtils.translateField(this.hass!, id)
+      })),
+      ...this._getAvailableSensors()
+    ];
+  }
+
   // Flag, das angibt, ob der Benutzer manuell Änderungen an den Einstellungen vorgenommen hat
   private _userChangedSettings = false;
   
@@ -380,7 +406,7 @@ export class BrokkoliAreaLegend extends LitElement {
   private _renderLabelOptions() {
     if (this._activeTab !== 'labels') return html``;
     
-    const availableSensors = this._getAvailableSensors();
+    const availableSensors = this._getAvailableLabels();
     
     return html`
       <div class="sensor-icons vertical" @click=${this._stopEvent}>

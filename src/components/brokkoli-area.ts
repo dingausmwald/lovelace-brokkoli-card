@@ -660,6 +660,20 @@ export class BrokkoliArea extends LitElement {
       
       // Rendert Sensorlabels für eine Pflanze basierend auf den plant/get_info Daten
       const sensorLabels = this._renderSensorLabels(entityId);
+
+      // Stammdaten-Badge: Strain und/oder Breeder, je nach Auswahl in der
+      // Legende. Beides aktiv ergibt "Strain - Breeder" in einer Zeile, nur
+      // eines davon steht ohne Trennstrich -- keine zweite Zeile.
+      const plantAttrs = this.hass?.states[entityId]?.attributes ?? {};
+      const activeLabelIds = this._getActiveLabels();
+      const strainParts: string[] = [];
+      if (activeLabelIds.includes('strain') && plantAttrs.strain) {
+        strainParts.push(String(plantAttrs.strain));
+      }
+      if (activeLabelIds.includes('breeder') && plantAttrs.breeder) {
+        strainParts.push(String(plantAttrs.breeder));
+      }
+      const strainText = strainParts.join(' - ');
       
       return html`
         <div 
@@ -686,9 +700,14 @@ export class BrokkoliArea extends LitElement {
               ${!image ? html`<ha-icon icon="mdi:flower"></ha-icon>` : ''}
             </div>
           </div>
-          <div class="entity-name ${isDragging ? 'dragging' : ''} ${isHovering ? 'hovering' : ''} ${isSelected ? 'selected' : ''}">
+          <div class="entity-name ${strainText ? 'shifted' : ''} ${isDragging ? 'dragging' : ''} ${isHovering ? 'hovering' : ''} ${isSelected ? 'selected' : ''}">
             ${name}
           </div>
+          ${strainText ? html`
+            <div class="entity-strain ${isDragging ? 'dragging' : ''} ${isHovering ? 'hovering' : ''} ${isSelected ? 'selected' : ''}">
+              ${strainText}
+            </div>
+          ` : ''}
           ${sensorLabels}
         </div>
       `;
@@ -2511,8 +2530,10 @@ export class BrokkoliArea extends LitElement {
   private _renderSensorLabels(entityId: string): TemplateResult {
     const plantInfo = this._plantInfoCache[entityId];
     
-    // Verwende die aktiven Labels statt this.showLabels
-    const activeLabels = this._getActiveLabels();
+    // Verwende die aktiven Labels statt this.showLabels. Strain und Breeder
+    // sind Stammdaten und werden als eigenes Badge gerendert, nicht hier.
+    const activeLabels = this._getActiveLabels()
+      .filter(id => id !== 'strain' && id !== 'breeder');
     
     // Wenn keine Labels konfiguriert sind, zeige nichts an
     if (activeLabels.length === 0) {

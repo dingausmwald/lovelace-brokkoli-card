@@ -299,6 +299,40 @@ export const positionStyles: CSSResult = css`
     z-index: 4;
   }
   
+  /* Stammdaten-Badge: steht an der Stelle, an der sonst der Name sitzt.
+     Ist es sichtbar, rückt der Name eine Badge-Höhe nach oben. */
+  .entity-strain {
+    position: absolute;
+    left: 50%;
+    top: calc(95%);
+    transform: translateX(-50%);
+    font-size: 0.7rem;
+    max-width: 140%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: center;
+    color: var(--secondary-text-color);
+    background-color: var(--card-background-color, #fff);
+    padding: 1px 5px;
+    border-radius: 10px;
+    opacity: 0.9;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    pointer-events: none;
+    transition: opacity 0.2s ease, box-shadow 0.2s ease;
+    z-index: 4;
+  }
+
+  .entity-name.shifted {
+    top: calc(95% - 18px);
+  }
+
+  .entity-strain.dragging,
+  .entity-strain.hovering {
+    opacity: 1;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+  }
+
   .entity-name.dragging,
   .entity-name.hovering {
     opacity: 1;
