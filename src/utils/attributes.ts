@@ -40,6 +40,37 @@ export const renderBattery = (card: BrokkoliCard) => {
         </div>
     `;
 }
+// Abgeleitete Balken haben keinen eigenen externen Sensor -- sie werden aus
+// einer anderen Messgroesse berechnet und stehen und fallen mit deren Zuweisung.
+const BALKEN_QUELLE: Record<string, string> = {
+    dli: 'illuminance',
+    ppfd: 'illuminance',
+    water_consumption: 'moisture',
+    fertilizer_consumption: 'conductivity',
+};
+
+// Ein Balken ohne zugewiesenen Sensor hat nichts anzuzeigen: die Plant-Entity
+// legt fuer jeden Typ eine Sensor-Entity an, ob zugewiesen oder nicht. Die
+// Zuweisung steht als Attribut external_sensor an genau dieser Entity.
+const hatZuweisung = (card: BrokkoliCard, elem: string): boolean => {
+    const result = (card.plantinfo as {
+        result?: Record<string, { sensor?: string } | undefined> & {
+            diagnostic_sensors?: Record<string, { entity_id?: string }>;
+        };
+    })?.result;
+    if (!result) return false;
+
+    // Gesundheit ist ein Helfer, den der Nutzer selbst setzt.
+    if (elem === 'health') return true;
+
+    // Beim Stromverbrauch sitzt die Zuweisung auf der Gesamt-Entity.
+    const sensor = elem === 'power_consumption'
+        ? result.diagnostic_sensors?.total_power_consumption?.entity_id
+        : (result[BALKEN_QUELLE[elem] ?? elem] as { sensor?: string } | undefined)?.sensor;
+
+    return Boolean(sensor && card._hass.states[sensor]?.attributes?.external_sensor);
+};
+
 export const renderAttributes = (card: BrokkoliCard): TemplateResult[] => {
     const icons: Icons = {};
     const uom: UOM = {};
@@ -61,6 +92,7 @@ export const renderAttributes = (card: BrokkoliCard): TemplateResult[] => {
     if (card.plantinfo && card.plantinfo.result) {
         const result = card.plantinfo.result;
         for (const elem of monitored) {
+            if (!hatZuweisung(card, elem)) continue;
             if (result[elem] || (elem === 'health' && result.helpers?.health)) {  // Check if health exists in helpers
                 let max, min, current, icon, sensor, unit_of_measurement;
                 
