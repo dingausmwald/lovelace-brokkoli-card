@@ -54,6 +54,7 @@ export default class BrokkoliListCard extends LitElement {
     @state() private _lastSelectedEntityId: string | null = null;
 
     private plantEntities: HomeAssistantEntity[] = [];
+    private plantIds = '';
     private readonly EDITABLE_PLANT_ATTRIBUTES = ConfigUtils.EDITABLE_PLANT_ATTRIBUTES;
     private stateManager?: StateManager;
 
@@ -92,8 +93,14 @@ export default class BrokkoliListCard extends LitElement {
             });
         }
         
-        // Nur beim ersten Setzen der hass-Property die volle Aktualisierung durchführen
-        if (!this.plantEntities.length) {
+        // Die volle Aktualisierung laeuft, sobald sich die Menge der Pflanzen
+        // aendert. Vorher lief sie nur beim allerersten hass-Update, und
+        // _refreshExistingEntities geht ausschliesslich die bereits bekannte
+        // Liste durch -- eine neu angelegte Pflanze tauchte deshalb erst nach
+        // einem Reload der Seite auf, eine geloeschte verschwand nie.
+        const ids = PlantEntityUtils.getPlantEntities(hass).map(plant => plant.entity_id).join(',');
+        if (ids !== this.plantIds) {
+            this.plantIds = ids;
             this.updatePlantEntities();
         } else {
             // Bei nachfolgenden Updates nur die vorhandenen Entitäten aktualisieren
