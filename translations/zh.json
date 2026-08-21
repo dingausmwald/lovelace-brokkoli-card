@@ -302,7 +302,8 @@
       "back_to_main_images": "返回主图片",
       "main_images": "主图片",
       "edit": "编辑",
-      "save": "保存"
+      "save": "保存",
+      "legend_collapsed_mode_active": "模式：已折叠（点击切换）"
     },
     "sensors": {
       "temperature": "温度",

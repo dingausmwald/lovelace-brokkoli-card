@@ -84,7 +84,8 @@
       "create": "Erstellen",
       "no_sensor": "Keiner",
       "edit": "Bearbeiten",
-      "save": "Speichern"
+      "save": "Speichern",
+      "legend_collapsed_mode_active": "Modus: Eingeklappt (Klick wechselt)"
     },
     "fields": {
       "friendly_name": "Name",

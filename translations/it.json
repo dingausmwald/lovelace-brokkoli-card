@@ -302,7 +302,8 @@
       "back_to_main_images": "Torna alle immagini principali",
       "main_images": "Immagini principali",
       "edit": "Modifica",
-      "save": "Salva"
+      "save": "Salva",
+      "legend_collapsed_mode_active": "Modalità: Compresso (clic per cambiare)"
     },
     "sensors": {
       "temperature": "Temperatura",

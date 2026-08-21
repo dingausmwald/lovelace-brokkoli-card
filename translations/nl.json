@@ -302,7 +302,8 @@
       "back_to_main_images": "Terug naar hoofdafbeeldingen",
       "main_images": "Hoofdafbeeldingen",
       "edit": "Bewerken",
-      "save": "Opslaan"
+      "save": "Opslaan",
+      "legend_collapsed_mode_active": "Modus: Ingeklapt (klik om te wisselen)"
     },
     "sensors": {
       "temperature": "Temperatuur",

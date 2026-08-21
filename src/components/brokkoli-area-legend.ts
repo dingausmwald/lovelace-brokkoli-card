@@ -62,12 +62,13 @@ export class BrokkoliAreaLegend extends LitElement {
   @property({ attribute: false }) initialHeatmapColor?: string;
   @property({ attribute: false }) initialHeatmapSecondaryColor?: string;
   @property({ attribute: false }) initialHeatmapOpacity?: number;
+  @property({ attribute: false }) initialActiveTab?: string;
   
   // Zugriff auf dynamische PlantInfo-Daten
   @property({ attribute: false }) plantInfo?: PlantInfo;
   
   // Aktueller Zustand der Legende
-  @state() private _activeTab = 'rings'; // 'rings', 'labels', oder 'heatmap'
+  @state() private _activeTab = 'rings'; // 'rings', 'labels', 'heatmap' oder 'collapsed'
   @state() private _selectedRings: string[] = [];
   @state() private _selectedLabels: string[] = [];
   @state() private _heatmapSensor?: string;
@@ -84,6 +85,7 @@ export class BrokkoliAreaLegend extends LitElement {
     this._heatmapColor = this._fixColorValue(this.initialHeatmapColor) || this._heatmapColor;
     this._heatmapSecondaryColor = this._fixColorValue(this.initialHeatmapSecondaryColor) || this._heatmapSecondaryColor;
     this._heatmapOpacity = this.initialHeatmapOpacity !== undefined ? this.initialHeatmapOpacity : this._heatmapOpacity;
+    this._activeTab = this.initialActiveTab || this._activeTab;
   }
   
   updated(changedProps: PropertyValues) {
@@ -199,15 +201,21 @@ export class BrokkoliAreaLegend extends LitElement {
   private _cycleTab(e: Event) {
     e.stopPropagation();
     
-    // Zyklisch durch die Tabs schalten
+    // Zyklisch durch die Tabs schalten. "collapsed" laesst nur den Umschalter
+    // stehen -- auf dem Handy nimmt die aufgeklappte Legende sonst den halben
+    // Bildschirm ein.
     if (this._activeTab === 'rings') {
       this._activeTab = 'labels';
     } else if (this._activeTab === 'labels') {
       this._activeTab = 'heatmap';
+    } else if (this._activeTab === 'heatmap') {
+      this._activeTab = 'collapsed';
     } else {
       this._activeTab = 'rings';
     }
-    
+
+    // Der Modus gehoert zu den Einstellungen, damit er den Reload ueberlebt.
+    this._dispatchSettingsChanged();
     this.requestUpdate();
   }
   
@@ -356,6 +364,10 @@ export class BrokkoliAreaLegend extends LitElement {
       case 'heatmap':
         icon = 'mdi:gradient';
         title = TranslationUtils.translateUI(this.hass, 'legend_heatmap_mode_active');
+        break;
+      case 'collapsed':
+        icon = 'mdi:unfold-more-horizontal';
+        title = TranslationUtils.translateUI(this.hass, 'legend_collapsed_mode_active');
         break;
     }
     

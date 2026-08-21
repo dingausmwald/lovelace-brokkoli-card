@@ -302,7 +302,8 @@
       "back_to_main_images": "Powrót do obrazów głównych",
       "main_images": "Obrazy główne",
       "edit": "Edytuj",
-      "save": "Zapisz"
+      "save": "Zapisz",
+      "legend_collapsed_mode_active": "Tryb: Zwinięty (kliknij, aby zmienić)"
     },
     "sensors": {
       "temperature": "Temperatura",

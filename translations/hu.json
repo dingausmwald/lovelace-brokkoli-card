@@ -302,7 +302,8 @@
       "back_to_main_images": "Vissza a főképekhez",
       "main_images": "Főképek",
       "edit": "Szerkesztés",
-      "save": "Mentés"
+      "save": "Mentés",
+      "legend_collapsed_mode_active": "Mód: Összecsukva (kattints a váltáshoz)"
     },
     "sensors": {
       "temperature": "Hőmérséklet",

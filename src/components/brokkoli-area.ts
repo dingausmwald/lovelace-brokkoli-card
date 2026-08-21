@@ -77,6 +77,7 @@ export class BrokkoliArea extends LitElement {
     heatmapColor?: string;
     heatmapSecondaryColor?: string;
     heatmapOpacity?: number;
+    activeTab?: string;
   } = {};
   
   @state() private _positions: Record<string, Position> = {};
@@ -1563,6 +1564,7 @@ export class BrokkoliArea extends LitElement {
             .initialHeatmap=${this._getHeatmapSensor()}
             .initialHeatmapColor=${this._getHeatmapColor()}
             .initialHeatmapSecondaryColor=${this._getHeatmapSecondaryColor()}
+            .initialActiveTab=${this._userSettings.activeTab}
             .plantInfo=${this._plantInfoCache[Object.keys(this._plantInfoCache)[0]]}
             @settings-changed=${this._handleSettingsChanged}
           ></brokkoli-area-legend>
@@ -2698,7 +2700,8 @@ export class BrokkoliArea extends LitElement {
       heatmap: settings.heatmapSensor,
       heatmapColor: settings.heatmapColor,
       heatmapSecondaryColor: settings.heatmapSecondaryColor,
-      heatmapOpacity: settings.heatmapOpacity
+      heatmapOpacity: settings.heatmapOpacity,
+      activeTab: settings.activeTab
     };
     
     try {

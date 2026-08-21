@@ -84,7 +84,8 @@
       "legend_heatmap_mode": "Heatmap mode",
       "confirm": "Confirm",
       "edit": "Edit",
-      "save": "Save"
+      "save": "Save",
+      "legend_collapsed_mode_active": "Mode: Collapsed (click to switch)"
     },
     "fields": {
       "friendly_name": "Name",
