@@ -49,8 +49,7 @@ window.customCards.push({
 export default class BrokkoliListCard extends LitElement {
     @property() _hass?: HomeAssistant;
     @property() config?: BrokkoliListCardConfig;
-    @state() private _showPlantDialog = false;
-    @state() private _dialogPosition = { x: 0, y: 0 };
+    private plantDialog?: HTMLElement;
     @state() private _lastSelectedEntityId: string | null = null;
 
     private plantEntities: HomeAssistantEntity[] = [];
@@ -244,15 +243,32 @@ export default class BrokkoliListCard extends LitElement {
     }
 
     private _handleAddPlant() {
-        this._showPlantDialog = true;
-        // Standardposition für Dialog setzen
-        this._dialogPosition = { x: 50, y: 50 };
-        this.requestUpdate();
+        if (!this._hass) return;
+        // Der Dialog haengt am <body>, nicht im Shadow-Root der Karte. Innerhalb
+        // der Karte lag er im selben Stapelkontext wie die Tabelle -- deren
+        // Buttons legten sich darueber, und der Abdunkler der Modalbox faerbte
+        // nur die Karte statt der Seite. Die Area-Karte macht es genauso.
+        this._removeDialog();
+        const dialog = document.createElement('plant-create-dialog') as HTMLElement & {
+            hass: HomeAssistant;
+            position: { x: number; y: number };
+            areaId: string;
+        };
+        document.body.appendChild(dialog);
+        dialog.hass = this._hass;
+        dialog.position = { x: 50, y: 50 };
+        dialog.areaId = this.config?.area || '';
+        dialog.addEventListener('dialog-closed', () => this._handleDialogClosed());
+        this.plantDialog = dialog;
+    }
+
+    private _removeDialog() {
+        this.plantDialog?.remove();
+        this.plantDialog = undefined;
     }
 
     private _handleDialogClosed() {
-        this._showPlantDialog = false;
-        this.requestUpdate();
+        this._removeDialog();
         // Nach dem Schließen des Dialogs Pflanzen aktualisieren
         this.updatePlantEntities();
     }
@@ -268,6 +284,7 @@ export default class BrokkoliListCard extends LitElement {
         
         // Alle Timeouts bereinigen, wenn die Karte entfernt wird
         PlantEntityUtils.clearAllTimeouts();
+        this._removeDialog();
     }
 
     private _handleFlowerImageClick(e: CustomEvent): void {
@@ -405,15 +422,6 @@ export default class BrokkoliListCard extends LitElement {
                 </ha-card>
             </div>
             
-            ${this._showPlantDialog ? html`
-                <plant-create-dialog
-                    .hass=${this._hass}
-                    .position=${this._dialogPosition}
-                    .areaId=${this.config?.area || ''}
-                    @dialog-closed=${this._handleDialogClosed}
-                ></plant-create-dialog>
-            ` : ''}
-
             ${state.showGallery ? html`
                 <flower-gallery
                     .hass=${this._hass}

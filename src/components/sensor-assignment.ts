@@ -446,10 +446,10 @@ export class SensorAssignment extends LitElement {
             const typeKeys = Object.keys(group.types);
             if (this._typeFilter.size > 0 && !typeKeys.some(t => this._typeFilter.has(t))) return false;
             if (!query) return true;
-            if (group.name.toLowerCase().includes(query)) return true;
-            // Auch nach entity_id suchen — bei gleichnamigen Geräten oft der
-            // einzige Unterschied.
-            return Object.values(group.types).some(id => id.toLowerCase().includes(query));
+            // Nur der Name. Die entity_ids mitzudurchsuchen machte die Suche
+            // unbrauchbar: "sensor" steht in jeder von ihnen, "temperatur" in
+            // jedem Gerät, das zufaellig einen Temperaturfuehler mitbringt.
+            return group.name.toLowerCase().includes(query);
         });
     }
 
@@ -469,7 +469,7 @@ export class SensorAssignment extends LitElement {
             if (phase && !phasen.has(phase)) return false;
             if (!raeume.has(this._areaOf(p.entityId))) return false;
             if (!query) return true;
-            return p.name.toLowerCase().includes(query) || p.entityId.toLowerCase().includes(query);
+            return p.name.toLowerCase().includes(query);
         });
     }
 

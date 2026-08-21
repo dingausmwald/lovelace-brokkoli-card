@@ -17,56 +17,51 @@ export interface SensorTypeDef {
 
 // Zuordnung Entity -> Pflanzen-Sensortyp.
 //
-// Wichtig ist die Reihenfolge der Prüfung: liegt eine device_class vor, ist SIE
-// allein maßgeblich; die Einheit wird nur als Notnagel für Entitäten ganz ohne
-// device_class herangezogen. Vorher galt "device_class ODER Einheit", was jeden
-// Prozentwert zur Luftfeuchte machte — ein Batteriestand (device_class battery,
-// Einheit %) wurde damit als Feuchtesensor angeboten und ließ sich einer
-// Pflanze zuweisen. Ebenso wird humidity nicht mehr zusätzlich auf moisture
-// gemappt: sonst hätte ein Luftfeuchte-Sensor beim Ablegen stillschweigend auch
-// die Bodenfeuchte überschrieben.
-// Erkennung: device_class ODER Einheit, bewusst nicht "device_class schlaegt
-// Einheit". Viele Bodenfeuchte-Sensoren melden device_class "humidity" statt
-// "moisture" -- mit einem Vorrang der device_class waren sie als Bodenfeuchte
-// nicht mehr zuweisbar. In einer Zuweisungs-Card ist zu viel anbieten harmlos,
-// zu wenig anbieten blockiert. Prozentwerte matchen deshalb beide Typen.
+// Liegt eine device_class vor, ist SIE allein maßgeblich; die Einheit zählt nur
+// für Entitäten ganz ohne device_class. "device_class ODER Einheit" hatte jeden
+// Prozentwert zugleich zu Bodenfeuchte UND Luftfeuchte gemacht — ein
+// Bodensensor bot beide Typen an, obwohl moisture = Bodenfeuchte und
+// humidity = Luftfeuchte zwei verschiedene Dinge sind. Dass manche
+// Integrationen ihre Bodenfeuchte als humidity ausliefern, ist deren Fehler und
+// wird hier nicht mehr aufgefangen: eine falsch deklarierte Entity korrigiert
+// man in der Entity-Registry, nicht in der Zuweisungslogik.
 export const SENSOR_TYPES: SensorTypeDef[] = [
     {
         key: 'temperature',
         icon: 'mdi:thermometer',
-        matches: (dc, u) => dc === 'temperature' || u === '°C' || u === '°F',
+        matches: (dc, u) => (dc ? dc === 'temperature' : (u === '°C' || u === '°F')),
     },
     {
         key: 'moisture',
         icon: 'mdi:water-percent',
-        matches: (dc, u) => dc === 'moisture' || u === '%',
+        matches: (dc, u) => (dc ? dc === 'moisture' : (u === '%')),
     },
     {
         key: 'illuminance',
         icon: 'mdi:brightness-5',
-        matches: (dc, u) => dc === 'illuminance' || u === 'lx' || u === 'lm',
+        matches: (dc, u) => (dc ? dc === 'illuminance' : (u === 'lx' || u === 'lm')),
     },
     {
         key: 'humidity',
         icon: 'mdi:water',
-        matches: (dc, u) => dc === 'humidity' || u === '%',
+        matches: (dc, u) => (dc ? dc === 'humidity' : (u === '%')),
     },
     {
         key: 'conductivity',
         icon: 'mdi:flash',
         // HA normalisiert das Mikro-Zeichen nicht — sowohl U+00B5 (Mikro) als
         // auch U+03BC (griechisches My) kommen in echten Konfigurationen vor.
-        matches: (dc, u) => dc === 'conductivity' || u === 'µS/cm' || u === 'μS/cm' || u === 'mS/cm',
+        matches: (dc, u) => (dc ? dc === 'conductivity' : (u === 'µS/cm' || u === 'μS/cm' || u === 'mS/cm')),
     },
     {
         key: 'power_consumption',
         icon: 'mdi:power-plug',
-        matches: (dc, u) => dc === 'power' || dc === 'energy' || u === 'W' || u === 'kW' || u === 'kWh' || u === 'Wh',
+        matches: (dc, u) => (dc ? dc === 'power' || dc === 'energy' : (u === 'W' || u === 'kW' || u === 'kWh' || u === 'Wh')),
     },
     {
         key: 'ph',
         icon: 'mdi:ph',
-        matches: (dc, u) => dc === 'ph' || u === 'pH',
+        matches: (dc, u) => (dc ? dc === 'ph' : (u === 'pH')),
     },
 ];
 
