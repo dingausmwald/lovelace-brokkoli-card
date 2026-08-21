@@ -225,7 +225,10 @@
       "flowering_past": "Kwitnienie minęło",
       "flowering_to_go": "Kwitnienie pozostało",
       "days": "Dni",
-      "plant_emoji_hint": "Znajdź duży wybór na [emojipedia.org](https://emojipedia.org)"
+      "plant_emoji_hint": "Znajdź duży wybór na [emojipedia.org](https://emojipedia.org)",
+      "create_plant": "Utwórz roślinę",
+      "create": "Utwórz",
+      "no_sensor": "Brak"
     },
     "sensors": {},
     "fields": {
@@ -287,7 +290,8 @@
       "growing_duration": "Czas Wzrostu",
       "flower_duration": "Czas Kwitnienia",
       "harvested_duration": "Czas Zbioru",
-      "removed_duration": "Czas Usunięcia"
+      "removed_duration": "Czas Usunięcia",
+      "plant_emoji": "Ikona"
     },
     "growth_phases": {
       "seeds": "Nasiono",

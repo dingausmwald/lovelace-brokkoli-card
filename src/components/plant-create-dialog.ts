@@ -119,31 +119,31 @@ class PlantCreateDialogClass extends LitElement {
       <div class="dialog-container">
         <div class="dialog-content">
           <div class="dialog-header">
-            <h2>Neue Pflanze erstellen</h2>
+            <h2>${TranslationUtils.translateUI(this.hass, 'create_plant')}</h2>
             <button class="close-button" @click=${this.closeDialog}>×</button>
           </div>
           <form @submit=${this.createPlant}>
             <div class="form-field">
-              <label for="name">Name</label>
+              <label for="name">${TranslationUtils.translateField(this.hass, 'friendly_name')}</label>
               <input type="text" id="name" name="name" required>
             </div>
             <div class="form-field">
-              <label for="strain">Strain</label>
+              <label for="strain">${TranslationUtils.translateField(this.hass, 'strain')}</label>
               <input type="text" id="strain" name="strain" required>
             </div>
             <div class="form-field">
-              <label for="breeder">Breeder</label>
+              <label for="breeder">${TranslationUtils.translateField(this.hass, 'breeder')}</label>
               <input type="text" id="breeder" name="breeder" required>
             </div>
             <div class="form-field">
-              <label for="plant_emoji">Icon</label>
+              <label for="plant_emoji">${TranslationUtils.translateField(this.hass, 'plant_emoji')}</label>
               <input type="text" id="plant_emoji" name="plant_emoji" value="🥦">
               <div class="field-hint">
                 ${this._hintWithLink(TranslationUtils.translateUI(this.hass, 'plant_emoji_hint'))}
               </div>
             </div>
             <div class="form-field">
-              <label for="growth_phase">Wachstumsphase</label>
+              <label for="growth_phase">${TranslationUtils.translateField(this.hass, 'growth_phase')}</label>
               <select id="growth_phase" name="growth_phase" required>
                 <option value="seeds">${TranslationUtils.translateGrowthPhase(this.hass, 'seeds')}</option>
                 <option value="germination">${TranslationUtils.translateGrowthPhase(this.hass, 'germination')}</option>
@@ -156,9 +156,9 @@ class PlantCreateDialogClass extends LitElement {
             </div>
             
             <div class="form-field">
-              <label for="temperature_sensor">Temperatursensor</label>
+              <label for="temperature_sensor">${TranslationUtils.translateSensor(this.hass, 'temperature')}</label>
               <select id="temperature_sensor" name="temperature_sensor">
-                <option value="">Keiner</option>
+                <option value="">${TranslationUtils.translateUI(this.hass, 'no_sensor')}</option>
                 ${Object.entries(this.hass.states)
                   .filter(([id, entity]) => {
                     const hassEntity = entity as HassEntity;
@@ -175,9 +175,9 @@ class PlantCreateDialogClass extends LitElement {
             </div>
             
             <div class="form-field">
-              <label for="moisture_sensor">Feuchtigkeitssensor</label>
+              <label for="moisture_sensor">${TranslationUtils.translateSensor(this.hass, 'soil_moisture')}</label>
               <select id="moisture_sensor" name="moisture_sensor">
-                <option value="">Keiner</option>
+                <option value="">${TranslationUtils.translateUI(this.hass, 'no_sensor')}</option>
                 ${Object.entries(this.hass.states)
                   .filter(([id, entity]) => {
                     const hassEntity = entity as HassEntity;
@@ -194,9 +194,9 @@ class PlantCreateDialogClass extends LitElement {
             </div>
             
             <div class="form-field">
-              <label for="conductivity_sensor">Leitfähigkeitssensor</label>
+              <label for="conductivity_sensor">${TranslationUtils.translateSensor(this.hass, 'conductivity')}</label>
               <select id="conductivity_sensor" name="conductivity_sensor">
-                <option value="">Keiner</option>
+                <option value="">${TranslationUtils.translateUI(this.hass, 'no_sensor')}</option>
                 ${Object.entries(this.hass.states)
                   .filter(([id, entity]) => {
                     const hassEntity = entity as HassEntity;
@@ -213,9 +213,9 @@ class PlantCreateDialogClass extends LitElement {
             </div>
             
             <div class="form-field">
-              <label for="ph_sensor">pH-Sensor</label>
+              <label for="ph_sensor">${TranslationUtils.translateSensor(this.hass, 'ph')}</label>
               <select id="ph_sensor" name="ph_sensor">
-                <option value="">Keiner</option>
+                <option value="">${TranslationUtils.translateUI(this.hass, 'no_sensor')}</option>
                 ${Object.entries(this.hass.states)
                   .filter(([id, entity]) => {
                     const hassEntity = entity as HassEntity;
@@ -232,9 +232,9 @@ class PlantCreateDialogClass extends LitElement {
             </div>
             
             <div class="form-field">
-              <label for="illuminance_sensor">Helligkeitssensor</label>
+              <label for="illuminance_sensor">${TranslationUtils.translateSensor(this.hass, 'illuminance')}</label>
               <select id="illuminance_sensor" name="illuminance_sensor">
-                <option value="">Keiner</option>
+                <option value="">${TranslationUtils.translateUI(this.hass, 'no_sensor')}</option>
                 ${Object.entries(this.hass.states)
                   .filter(([id, entity]) => {
                     const hassEntity = entity as HassEntity;
@@ -251,9 +251,9 @@ class PlantCreateDialogClass extends LitElement {
             </div>
             
             <div class="form-field">
-              <label for="humidity_sensor">Luftfeuchtigkeitssensor</label>
+              <label for="humidity_sensor">${TranslationUtils.translateSensor(this.hass, 'air_humidity')}</label>
               <select id="humidity_sensor" name="humidity_sensor">
-                <option value="">Keiner</option>
+                <option value="">${TranslationUtils.translateUI(this.hass, 'no_sensor')}</option>
                 ${Object.entries(this.hass.states)
                   .filter(([id, entity]) => {
                     const hassEntity = entity as HassEntity;
@@ -270,9 +270,9 @@ class PlantCreateDialogClass extends LitElement {
             </div>
             
             <div class="form-field">
-              <label for="power_consumption_sensor">Energieverbrauchssensor</label>
+              <label for="power_consumption_sensor">${TranslationUtils.translateSensor(this.hass, 'total_power_consumption')}</label>
               <select id="power_consumption_sensor" name="power_consumption_sensor">
-                <option value="">Keiner</option>
+                <option value="">${TranslationUtils.translateUI(this.hass, 'no_sensor')}</option>
                 ${Object.entries(this.hass.states)
                   .filter(([id, entity]) => {
                     const hassEntity = entity as HassEntity;
@@ -289,8 +289,8 @@ class PlantCreateDialogClass extends LitElement {
             </div>
             
             <div class="form-actions">
-              <button type="button" @click=${this.closeDialog}>Abbrechen</button>
-              <button type="submit">Erstellen</button>
+              <button type="button" @click=${this.closeDialog}>${TranslationUtils.translateUI(this.hass, 'cancel')}</button>
+              <button type="submit">${TranslationUtils.translateUI(this.hass, 'create')}</button>
             </div>
           </form>
         </div>

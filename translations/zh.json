@@ -225,7 +225,10 @@
       "flowering_past": "已过开花期",
       "flowering_to_go": "剩余开花期",
       "days": "天",
-      "plant_emoji_hint": "在 [emojipedia.org](https://emojipedia.org) 找到大量选择"
+      "plant_emoji_hint": "在 [emojipedia.org](https://emojipedia.org) 找到大量选择",
+      "create_plant": "创建植物",
+      "create": "创建",
+      "no_sensor": "无"
     },
     "sensors": {},
     "fields": {
@@ -287,7 +290,8 @@
       "growing_duration": "生长持续时间",
       "flower_duration": "开花持续时间",
       "harvested_duration": "收获持续时间",
-      "removed_duration": "移除持续时间"
+      "removed_duration": "移除持续时间",
+      "plant_emoji": "图标"
     },
     "growth_phases": {
       "seeds": "种子",

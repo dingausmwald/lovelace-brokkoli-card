@@ -48,7 +48,10 @@
       "flowering_past": "Flowering past",
       "flowering_to_go": "Flowering remaining",
       "days": "Days",
-      "plant_emoji_hint": "Find a large selection at [emojipedia.org](https://emojipedia.org)"
+      "plant_emoji_hint": "Find a large selection at [emojipedia.org](https://emojipedia.org)",
+      "create_plant": "Create Plant",
+      "create": "Create",
+      "no_sensor": "None"
     },
     "fields": {
       "friendly_name": "Name",
@@ -109,7 +112,8 @@
       "growing_duration": "Growth Duration",
       "flower_duration": "Flower Duration",
       "harvested_duration": "Harvested Duration",
-      "removed_duration": "Removed Duration"
+      "removed_duration": "Removed Duration",
+      "plant_emoji": "Icon"
     },
     "sensors": {
       "temperature": "Temperature",

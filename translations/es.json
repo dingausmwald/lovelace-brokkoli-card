@@ -225,7 +225,10 @@
       "flowering_past": "Floración pasada",
       "flowering_to_go": "Floración restante",
       "days": "Días",
-      "plant_emoji_hint": "Encuentra una gran selección en [emojipedia.org](https://emojipedia.org)"
+      "plant_emoji_hint": "Encuentra una gran selección en [emojipedia.org](https://emojipedia.org)",
+      "create_plant": "Crear planta",
+      "create": "Crear",
+      "no_sensor": "Ninguno"
     },
     "sensors": {},
     "fields": {
@@ -287,7 +290,8 @@
       "growing_duration": "Duración de Crecimiento",
       "flower_duration": "Duración de Floración",
       "harvested_duration": "Duración de Cosecha",
-      "removed_duration": "Duración de Eliminación"
+      "removed_duration": "Duración de Eliminación",
+      "plant_emoji": "Icono"
     },
     "growth_phases": {
       "seeds": "Semilla",

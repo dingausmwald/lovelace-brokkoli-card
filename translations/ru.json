@@ -225,7 +225,10 @@
       "flowering_past": "Цветение прошло",
       "flowering_to_go": "Цветение осталось",
       "days": "Дни",
-      "plant_emoji_hint": "Найдите большой выбор на [emojipedia.org](https://emojipedia.org)"
+      "plant_emoji_hint": "Найдите большой выбор на [emojipedia.org](https://emojipedia.org)",
+      "create_plant": "Создать растение",
+      "create": "Создать",
+      "no_sensor": "Нет"
     },
     "sensors": {},
     "fields": {
@@ -287,7 +290,8 @@
       "growing_duration": "Продолжительность роста",
       "flower_duration": "Продолжительность цветения",
       "harvested_duration": "Длительность Урожая",
-      "removed_duration": "Длительность Удаления"
+      "removed_duration": "Длительность Удаления",
+      "plant_emoji": "Иконка"
     },
     "growth_phases": {
       "seeds": "Семя",

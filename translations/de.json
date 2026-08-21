@@ -79,7 +79,10 @@
       "legend_heatmap_mode_active": "Modus: Heatmap (Klick wechselt)",
       "flowering_past": "Bisherige Blüte",
       "flowering_to_go": "Restliche Blüte",
-      "plant_emoji_hint": "Eine große Auswahl findest du auf [emojipedia.org](https://emojipedia.org)"
+      "plant_emoji_hint": "Eine große Auswahl findest du auf [emojipedia.org](https://emojipedia.org)",
+      "create_plant": "Pflanze erstellen",
+      "create": "Erstellen",
+      "no_sensor": "Keiner"
     },
     "fields": {
       "friendly_name": "Name",
@@ -140,7 +143,8 @@
       "growing_duration": "Wachstum Dauer",
       "flower_duration": "Blüte Dauer",
       "harvested_duration": "Geerntet Dauer",
-      "removed_duration": "Entfernt Dauer"
+      "removed_duration": "Entfernt Dauer",
+      "plant_emoji": "Icon"
     },
     "sensors": {
       "temperature": "Temperatur",

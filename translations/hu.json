@@ -225,7 +225,10 @@
       "flowering_past": "Eltelt virágzás",
       "flowering_to_go": "Hátralévő virágzás",
       "days": "Napok",
-      "plant_emoji_hint": "Nagy választék található az [emojipedia.org](https://emojipedia.org) oldalon"
+      "plant_emoji_hint": "Nagy választék található az [emojipedia.org](https://emojipedia.org) oldalon",
+      "create_plant": "Növény létrehozása",
+      "create": "Létrehozás",
+      "no_sensor": "Nincs"
     },
     "sensors": {},
     "fields": {
@@ -287,7 +290,8 @@
       "growing_duration": "Növekedési időtartam",
       "flower_duration": "Virágzási időtartam",
       "harvested_duration": "Betakarítás Időtartam",
-      "removed_duration": "Eltávolítás Időtartam"
+      "removed_duration": "Eltávolítás Időtartam",
+      "plant_emoji": "Ikon"
     },
     "growth_phases": {
       "seeds": "Mag",

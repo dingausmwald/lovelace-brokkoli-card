@@ -225,7 +225,10 @@
       "flowering_past": "Bloei verstreken",
       "flowering_to_go": "Bloei resterend",
       "days": "Dagen",
-      "plant_emoji_hint": "Vind een grote selectie op [emojipedia.org](https://emojipedia.org)"
+      "plant_emoji_hint": "Vind een grote selectie op [emojipedia.org](https://emojipedia.org)",
+      "create_plant": "Plant maken",
+      "create": "Maken",
+      "no_sensor": "Geen"
     },
     "sensors": {},
     "fields": {
@@ -287,7 +290,8 @@
       "growing_duration": "Groeiduur",
       "flower_duration": "Bloeiduur",
       "harvested_duration": "Geoogst Duur",
-      "removed_duration": "Verwijderd Duur"
+      "removed_duration": "Verwijderd Duur",
+      "plant_emoji": "Pictogram"
     },
     "growth_phases": {
       "seeds": "Zaad",
