@@ -130,6 +130,10 @@ class PlantCreateDialogClass extends LitElement {
             <div class="form-field">
               <label for="plant_emoji">Icon</label>
               <input type="text" id="plant_emoji" name="plant_emoji" value="🥦">
+              <div class="field-hint">
+                Wandert an das Ende des Namens. Eine große Auswahl findest du auf
+                <a href="https://emojipedia.org" target="_blank" rel="noopener">emojipedia.org</a>
+              </div>
             </div>
             <div class="form-field">
               <label for="growth_phase">Wachstumsphase</label>
@@ -347,6 +351,16 @@ class PlantCreateDialogClass extends LitElement {
         font-weight: 500;
       }
       
+      .field-hint {
+        margin-top: 0.3rem;
+        font-size: 0.8rem;
+        color: var(--secondary-text-color, #727272);
+      }
+
+      .field-hint a {
+        color: var(--primary-color);
+      }
+
       input, select {
         width: 100%;
         padding: 0.5rem;
