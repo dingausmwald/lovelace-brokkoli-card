@@ -592,6 +592,16 @@ export const style = css`
     transition-delay: 0.3s;
   }
 
+  /* .tooltip ist positioniert und hat einen z-index -- damit oeffnet es einen
+     eigenen Stapelkontext, und die 99999 des .tip zaehlen nur INNERHALB davon.
+     Nach aussen galt die 2 der Kachel, also lag der Tooltip unter Menue-Button
+     (3), Flyout (10) und Dropdown (100) und sah abgeschnitten aus. Angehoben
+     wird nur beim Hovern: im Ruhezustand bleiben die Balken unter einem
+     geoeffneten Menue. */
+  .tooltip:hover {
+    z-index: 500;
+  }
+
   /* Ensure tooltips don't get cut off at the edges */
   .attributes .tooltip:first-child .tip {
     left: 20%;

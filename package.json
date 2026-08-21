@@ -1,6 +1,6 @@
 {
     "name": "brokkoli-card",
-    "version": "2026.8.20",
+    "version": "2026.8.21",
     "description": "A Lovelace brokkoli card for Home Assistant",
     "main": "brokkoli-card.js",
     "repository": {
