@@ -685,11 +685,15 @@ export const style = css`
   }
 
   /* Bearbeiten-Leiste des Info-Bereichs */
+  /* Sitzt in der oberen rechten Ecke des Rasters statt in einer eigenen Zelle --
+     als Zelle nahm der Stift den Platz des ersten Feldes ein. */
   .details-actions {
-    width: 100%;
+    position: absolute;
+    top: 0;
+    right: 8px;
     display: flex;
-    justify-content: flex-end;
     gap: 8px;
+    z-index: 1;
   }
 
   .details-actions ha-icon {
@@ -789,6 +793,7 @@ export const style = css`
     margin: 8px 0;
     padding: 0 8px;
     box-sizing: border-box;
+    position: relative;
   }
 
   /* Wenn plant-details das erste Element ist */
