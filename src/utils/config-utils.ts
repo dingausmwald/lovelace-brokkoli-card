@@ -86,16 +86,26 @@ export class ConfigUtils {
 
         const visibleColumns: Array<{id: string, name: string, group: string}> = [];
         
+        // Die Standardkonfiguration schaltet die Gruppe "sensors" UND jeden
+        // einzelnen Sensor darin ein -- ohne diese Sperre landete damit jede
+        // Sensorspalte zweimal in der Tabelle.
+        const gesehen = new Set<string>();
+        const aufnehmen = (spalte: {id: string, name: string, group: string}) => {
+            if (gesehen.has(spalte.id)) return;
+            gesehen.add(spalte.id);
+            visibleColumns.push(spalte);
+        };
+
         // Iteriere durch die Konfiguration in der Reihenfolge
         for (const [key, value] of Object.entries(showColumns)) {
             if (value) {
                 // Wenn es eine Gruppe ist
                 if (groupMap.has(key)) {
-                    visibleColumns.push(...groupMap.get(key)!);
+                    groupMap.get(key)!.forEach(aufnehmen);
                 }
                 // Wenn es eine Spalten-ID ist
                 else if (columnMap.has(key)) {
-                    visibleColumns.push(columnMap.get(key)!);
+                    aufnehmen(columnMap.get(key)!);
                 }
             }
         }
