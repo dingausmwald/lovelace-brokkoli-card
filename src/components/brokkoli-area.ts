@@ -120,6 +120,7 @@ export class BrokkoliArea extends LitElement {
   
   // Timer für die verzögerte Datenaktualisierung
   private _updateTimeout: number = 0;
+  private _lastPlantDataLoad = 0;
 
   // ResizeObserver erkennt sowohl Resize als auch Visibility-Changes
   // (z.B. Tab-Switch). window-resize verfehlt letzteren Fall.
@@ -2759,17 +2760,17 @@ export class BrokkoliArea extends LitElement {
     const plantEntities = this.entities.filter(entityId => entityId.startsWith('plant.'));
     if (plantEntities.length === 0) return;
     
-    // Prüfen, ob wir bereits Daten im Cache haben
-    let allDataLoaded = true;
-    for (const entityId of plantEntities) {
-      if (!this._plantInfoCache[entityId] || !this._plantInfoCache[entityId].result) {
-        allDataLoaded = false;
-        break;
-      }
-    }
-    
-    // Wenn wir bereits Daten für alle Pflanzen haben, identifiziere Cycle-Gruppen und plane Update
-    if (allDataLoaded) {
+    // Frisch geladene Daten nicht sofort noch einmal holen: updated() ruft diese
+    // Methode bei jeder Entitaets-Aenderung auf. Der 10-Sekunden-Takt weiter
+    // unten kommt aber durch -- vorher stieg die Methode aus, sobald irgendetwas
+    // im Cache lag, und lud danach nie wieder nach: die Badges standen fuer den
+    // Rest der Sitzung auf den Werten des ersten Ladens.
+    const frisch = Date.now() - this._lastPlantDataLoad < 5000;
+    const vollstaendig = plantEntities.every(
+      entityId => this._plantInfoCache[entityId]?.result
+    );
+
+    if (frisch && vollstaendig) {
       // Identifiziere die Cycle-Gruppen mit den vorhandenen Daten
       this._identifyCycleGroups();
       this.requestUpdate();
@@ -2808,6 +2809,7 @@ export class BrokkoliArea extends LitElement {
     
     // Warte, bis alle Daten geladen wurden
     await Promise.all(loadPromises);
+    this._lastPlantDataLoad = Date.now();
     
     // Identifiziere die Cycle-Gruppen erst nach dem Laden aller Daten
     this._identifyCycleGroups();
