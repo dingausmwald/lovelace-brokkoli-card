@@ -451,25 +451,6 @@
       "filter_range_to": "do",
       "add_plant": "Dodaj Nową Roślinę"
     },
-    "graph": {
-      "temperature": "Temperatura",
-      "conductivity": "Przewodność",
-      "dli": "DLI",
-      "health": "Zdrowie",
-      "water_consumption": "Zużycie Wody",
-      "fertilizer_consumption": "Zużycie Nawozu",
-      "power_consumption": "Zużycie Energii"
-    },
-    "diagnostics": {
-      "energy_cost": "Koszt Energii",
-      "total_power_consumption": "Całkowite Zużycie Energii",
-      "total_integral": "Całkowita Całka",
-      "total_water_consumption": "Całkowite Zużycie Wody",
-      "total_fertilizer_consumption": "Całkowite Zużycie Nawozu",
-      "power_consumption": "Zużycie Energii",
-      "ppfd_mol": "PPFD",
-      "total_ppfd_mol_integral": "Całkowite PPFD"
-    },
     "helpers": {
       "growth_phase": "Faza Wzrostu",
       "flowering_duration": "Czas Kwitnienia",

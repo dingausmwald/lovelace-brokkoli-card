@@ -451,25 +451,6 @@
       "filter_range_to": "до",
       "add_plant": "Добавить Новое Растение"
     },
-    "graph": {
-      "temperature": "Температура",
-      "conductivity": "Проводимость",
-      "dli": "DLI",
-      "health": "Здоровье",
-      "water_consumption": "Потребление Воды",
-      "fertilizer_consumption": "Потребление Удобрений",
-      "power_consumption": "Потребление Энергии"
-    },
-    "diagnostics": {
-      "energy_cost": "Стоимость Энергии",
-      "total_power_consumption": "Общее Потребление Энергии",
-      "total_integral": "Общий Интеграл",
-      "total_water_consumption": "Общее Потребление Воды",
-      "total_fertilizer_consumption": "Общее Потребление Удобрений",
-      "power_consumption": "Потребление Энергии",
-      "ppfd_mol": "PPFD",
-      "total_ppfd_mol_integral": "Общий PPFD"
-    },
     "helpers": {
       "growth_phase": "Фаза Роста",
       "flowering_duration": "Длительность Цветения",

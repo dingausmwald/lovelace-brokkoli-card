@@ -451,25 +451,6 @@
       "filter_range_to": "ig",
       "add_plant": "Új Növény Hozzáadása"
     },
-    "graph": {
-      "temperature": "Hőmérséklet",
-      "conductivity": "Vezetőképesség",
-      "dli": "DLI",
-      "health": "Egészség",
-      "water_consumption": "Vízfogyasztás",
-      "fertilizer_consumption": "Műtrágya Fogyasztás",
-      "power_consumption": "Energiafogyasztás"
-    },
-    "diagnostics": {
-      "energy_cost": "Energia Költség",
-      "total_power_consumption": "Összes Energiafogyasztás",
-      "total_integral": "Összes Integrál",
-      "total_water_consumption": "Összes Vízfogyasztás",
-      "total_fertilizer_consumption": "Összes Műtrágya Fogyasztás",
-      "power_consumption": "Energiafogyasztás",
-      "ppfd_mol": "PPFD",
-      "total_ppfd_mol_integral": "Összes PPFD"
-    },
     "helpers": {
       "growth_phase": "Növekedési Fázis",
       "flowering_duration": "Virágzás Időtartama",

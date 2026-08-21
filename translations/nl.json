@@ -451,25 +451,6 @@
       "filter_range_to": "tot",
       "add_plant": "Nieuwe Plant Toevoegen"
     },
-    "graph": {
-      "temperature": "Temperatuur",
-      "conductivity": "Geleidbaarheid",
-      "dli": "DLI",
-      "health": "Gezondheid",
-      "water_consumption": "Waterverbruik",
-      "fertilizer_consumption": "Mestverbruik",
-      "power_consumption": "Energieverbruik"
-    },
-    "diagnostics": {
-      "energy_cost": "Energiekosten",
-      "total_power_consumption": "Totaal Energieverbruik",
-      "total_integral": "Totale Integraal",
-      "total_water_consumption": "Totaal Waterverbruik",
-      "total_fertilizer_consumption": "Totaal Mestverbruik",
-      "power_consumption": "Energieverbruik",
-      "ppfd_mol": "PPFD",
-      "total_ppfd_mol_integral": "Totale PPFD"
-    },
     "helpers": {
       "growth_phase": "Groeifase",
       "flowering_duration": "Bloei Duur",

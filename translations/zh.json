@@ -451,25 +451,6 @@
       "filter_range_to": "到",
       "add_plant": "添加新植物"
     },
-    "graph": {
-      "temperature": "温度",
-      "conductivity": "电导率",
-      "dli": "DLI",
-      "health": "健康",
-      "water_consumption": "用水量",
-      "fertilizer_consumption": "肥料消耗",
-      "power_consumption": "电力消耗"
-    },
-    "diagnostics": {
-      "energy_cost": "能源成本",
-      "total_power_consumption": "总电力消耗",
-      "total_integral": "总积分",
-      "total_water_consumption": "总用水量",
-      "total_fertilizer_consumption": "总肥料消耗",
-      "power_consumption": "电力消耗",
-      "ppfd_mol": "PPFD",
-      "total_ppfd_mol_integral": "总PPFD"
-    },
     "helpers": {
       "growth_phase": "生长阶段",
       "flowering_duration": "开花持续时间",
