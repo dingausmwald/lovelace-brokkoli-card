@@ -152,6 +152,26 @@ export class BrokkoliArea extends LitElement {
     
     // Event-Listener für neu erstellte Pflanzen hinzufügen
     this.addEventListener('plant-created', this._handlePlantCreated);
+
+    this._userSettings = this._ladeEinstellungen();
+  }
+
+  // Die Legenden-Einstellungen (Ringe, Labels, Heatmap) sind eine Ansichtssache
+  // des Betrachters, keine Konfiguration der Karte -- eine Lovelace-Karte kann
+  // ihre eigene YAML ausserhalb des Dashboard-Editors ohnehin nicht schreiben.
+  // Sie liegen deshalb pro Raum im localStorage des Browsers; die YAML bleibt
+  // die Vorgabe, solange nichts gespeichert ist.
+  private get _speicherSchluessel(): string {
+    return `brokkoli-area:${this.areaId || 'default'}`;
+  }
+
+  private _ladeEinstellungen(): typeof this._userSettings {
+    try {
+      const roh = localStorage.getItem(this._speicherSchluessel);
+      return roh ? JSON.parse(roh) : {};
+    } catch {
+      return {};
+    }
   }
   
   // Wird aufgerufen, wenn sich Eigenschaften ändern
@@ -2681,6 +2701,13 @@ export class BrokkoliArea extends LitElement {
       heatmapOpacity: settings.heatmapOpacity
     };
     
+    try {
+      localStorage.setItem(this._speicherSchluessel, JSON.stringify(this._userSettings));
+    } catch {
+      // Kein Speicher verfuegbar (privater Modus, volles Kontingent) -- die
+      // Einstellungen gelten dann nur fuer diese Sitzung.
+    }
+
     // Erzwinge ein Update der Komponente
     this.requestUpdate();
   }
