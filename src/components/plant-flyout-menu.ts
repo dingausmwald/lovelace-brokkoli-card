@@ -109,17 +109,28 @@ export class PlantFlyoutMenu extends LitElement {
         Object.entries(this._cloneData).filter(([, v]) => v !== '' && v != null)
       );
 
-      await this.hass.callService('plant', 'clone_plant', {
-        source_entity_id: this._selectedPlantForClone.entity_id,
-        ...angaben
-      });
+      // Die Service-Antwort traegt entity_id und device_id des Klons. Ohne sie
+      // kann ihn niemand positionieren oder dem Raum zuordnen -- deshalb landete
+      // ein Klon bisher nirgends. callService reicht Antworten nicht durch.
+      const antwort = await this.hass.callWS({
+        type: 'call_service',
+        domain: 'plant',
+        service: 'clone_plant',
+        service_data: {
+          source_entity_id: this._selectedPlantForClone.entity_id,
+          ...angaben
+        },
+        return_response: true
+      }) as { response?: { entity_id?: string; device_id?: string } };
 
       this.dispatchEvent(new CustomEvent('plant-cloned', {
         bubbles: true,
         composed: true,
         detail: {
           source_entity_id: this._selectedPlantForClone.entity_id,
-          position: this.position,
+          entity_id: antwort?.response?.entity_id,
+          device_id: antwort?.response?.device_id,
+          position: this.targetPosition,
           areaId: this.areaId
         }
       }));

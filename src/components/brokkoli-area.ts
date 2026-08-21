@@ -2472,35 +2472,49 @@ export class BrokkoliArea extends LitElement {
     await Promise.all(savePromises);
     
     // Zusätzlich: Setze die Area für die verschobene Pflanze
-    if (this.areaId) {
-      try {
-        // Hole die Device-ID der Pflanze
-        const entity = this.hass.entities[plant.entity_id];
-        if (entity?.device_id) {
-          // Formatiere die Area-ID (lowercase und Umlaute ersetzen)
-          const formattedAreaId = this.areaId.toLowerCase()
-            .replace(/ä/g, 'a').replace(/ö/g, 'o').replace(/ü/g, 'u')
-            .replace(/ß/g, 'ss');
-          
-          await this.hass.callService('plant', 'move_to_area', {
-            device_id: [entity.device_id],
-            area_id: formattedAreaId
-          });
-        }
-      } catch (error) {
-        console.error('Fehler beim Setzen der Area:', error);
-      }
-    }
+    await this._assignArea(this.hass.entities[plant.entity_id]?.device_id);
     
     // Schließe das Flyout und lade neu
     this._showPlantFlyout = false;
     this._loadPositions();
   };
 
-  private _handlePlantCloned = () => {
+  // Ordnet ein Gerät der Area der Karte zu.
+  private async _assignArea(deviceId?: string) {
+    if (!this.hass || !this.areaId || !deviceId) return;
+    try {
+      // Formatiere die Area-ID (lowercase und Umlaute ersetzen)
+      const formattedAreaId = this.areaId.toLowerCase()
+        .replace(/ä/g, 'a').replace(/ö/g, 'o').replace(/ü/g, 'u')
+        .replace(/ß/g, 'ss');
+
+      await this.hass.callService('plant', 'move_to_area', {
+        device_id: [deviceId],
+        area_id: formattedAreaId
+      });
+    } catch (error) {
+      console.error('Fehler beim Setzen der Area:', error);
+    }
+  }
+
+  private _handlePlantCloned = async (e: CustomEvent) => {
     // Schließe das Flyout nach erfolgreichem Klonen
     this._showPlantFlyout = false;
     this.requestUpdate();
+
+    // Der Klon ist eine neue Pflanze ohne Position und ohne Raum. Beides muss
+    // hier gesetzt werden, sonst taucht er nirgends auf.
+    const { entity_id, device_id, position } = e.detail ?? {};
+    if (!this.hass || !entity_id || !position) return;
+
+    this._positions[entity_id] = position;
+    this._calculateBounds();
+    this._normalizePositions();
+    await Promise.all(Object.entries(this._positions).map(([eid, pos]) => this._savePosition(eid, pos)));
+
+    await this._assignArea(device_id ?? this.hass.entities[entity_id]?.device_id);
+
+    this._loadPositions();
   };
 
   private _handleMenuClosed = () => {
