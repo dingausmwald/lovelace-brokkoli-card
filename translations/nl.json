@@ -300,7 +300,9 @@
       "no_matching_sensors": "Geen passende sensoren gevonden",
       "other_images": "Andere afbeeldingen",
       "back_to_main_images": "Terug naar hoofdafbeeldingen",
-      "main_images": "Hoofdafbeeldingen"
+      "main_images": "Hoofdafbeeldingen",
+      "edit": "Bewerken",
+      "save": "Opslaan"
     },
     "sensors": {
       "temperature": "Temperatuur",

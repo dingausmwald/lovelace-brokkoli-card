@@ -300,7 +300,9 @@
       "no_matching_sensors": "未找到匹配的传感器",
       "other_images": "其他图片",
       "back_to_main_images": "返回主图片",
-      "main_images": "主图片"
+      "main_images": "主图片",
+      "edit": "编辑",
+      "save": "保存"
     },
     "sensors": {
       "temperature": "温度",

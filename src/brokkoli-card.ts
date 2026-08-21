@@ -48,6 +48,8 @@ export default class BrokkoliCard extends LitElement {
     @state() private _isFading = false;
     @state() private _activePopup: string | null = null;
     @state() private _showFlyoutMenu = false;
+    @state() private _detailsEditing = false;
+    private _detailsDraft: Record<string, string> = {};
     @state() private _popupData: any = {};
     @state() private _showPlantDropdown = false;
     @state() public selectedPlantEntity: string | null = null;
@@ -1011,159 +1013,99 @@ export default class BrokkoliCard extends LitElement {
         return html`<div class="expanded-content" data-section="history"></div>`;
     }
 
+    // Ein Eintrag je Zeile des Info-Bereichs. attr weicht nur dort vom Key ab, wo
+    // das State-Attribut anders heisst als das Service-Feld.
+    private static readonly DETAIL_FIELDS: Array<{
+        key: string; attr?: string; wide?: boolean; multiline?: boolean; readonly?: boolean; link?: boolean;
+    }> = [
+        { key: 'strain', attr: 'variety', readonly: true },
+        { key: 'feminized', readonly: true },
+        { key: 'effects' },
+        { key: 'smell' },
+        { key: 'taste' },
+        { key: 'phenotype' },
+        { key: 'hunger' },
+        { key: 'growth_stretch' },
+        { key: 'flower_stretch' },
+        { key: 'mold_resistance' },
+        { key: 'difficulty' },
+        { key: 'yield' },
+        { key: 'website', link: true },
+        { key: 'notes' },
+        { key: 'infotext1', wide: true, multiline: true },
+        { key: 'infotext2', wide: true, multiline: true },
+        { key: 'lineage', wide: true },
+    ];
+
+    private _startDetailsEdit() {
+        const draft: Record<string, string> = {};
+        for (const field of BrokkoliCard.DETAIL_FIELDS) {
+            if (field.readonly) continue;
+            draft[field.key] = String(this.stateObj.attributes[field.attr ?? field.key] ?? '');
+        }
+        this._detailsDraft = draft;
+        this._detailsEditing = true;
+    }
+
+    private async _saveDetailsEdit() {
+        const geaendert: Record<string, string> = {};
+        for (const [key, value] of Object.entries(this._detailsDraft)) {
+            if (value !== String(this.stateObj.attributes[key] ?? '')) geaendert[key] = value;
+        }
+        if (Object.keys(geaendert).length > 0) {
+            await this._hass.callService('plant', 'update_plant_attributes', {
+                entity_id: this.stateObj.entity_id,
+                ...geaendert
+            });
+        }
+        this._detailsEditing = false;
+    }
+
+    private _renderDetailFields(): TemplateResult {
+        const bearbeiten = this._detailsEditing;
+        return html`
+            <div class="plant-details">
+                <div class="details-actions">
+                    ${bearbeiten ? html`
+                        <ha-icon icon="mdi:close" title="${TranslationUtils.translateUI(this._hass, 'cancel')}"
+                                 @click="${() => { this._detailsEditing = false; }}"></ha-icon>
+                        <ha-icon icon="mdi:check" title="${TranslationUtils.translateUI(this._hass, 'save')}"
+                                 @click="${this._saveDetailsEdit}"></ha-icon>
+                    ` : html`
+                        <ha-icon icon="mdi:pencil" title="${TranslationUtils.translateUI(this._hass, 'edit')}"
+                                 @click="${this._startDetailsEdit}"></ha-icon>
+                    `}
+                </div>
+                ${BrokkoliCard.DETAIL_FIELDS.map(field => {
+                    const wert = String(this.stateObj.attributes[field.attr ?? field.key] ?? '');
+                    return html`
+                        <div class="detail-item ${field.wide ? 'full-width' : ''}">
+                            <span class="label">${TranslationUtils.translateField(this._hass, field.key)}</span>
+                            ${bearbeiten && !field.readonly
+                                ? (field.multiline
+                                    ? html`<textarea class="detail-edit" rows="3"
+                                            .value="${this._detailsDraft[field.key] ?? ''}"
+                                            @input="${(e: InputEvent) => { this._detailsDraft[field.key] = (e.target as HTMLTextAreaElement).value; }}"></textarea>`
+                                    : html`<input type="text" class="detail-edit"
+                                            .value="${this._detailsDraft[field.key] ?? ''}"
+                                            @input="${(e: InputEvent) => { this._detailsDraft[field.key] = (e.target as HTMLInputElement).value; }}">`)
+                                : (field.link && wert
+                                    ? html`<a href="${wert}" target="_blank" class="value link">${wert}</a>`
+                                    : html`<span class="value">${wert || '-'}</span>`)}
+                        </div>
+                    `;
+                })}
+            </div>
+        `;
+    }
+
     private _renderDetails(): TemplateResult {
         if (this.config.show_elements.includes('details')) {
-            // Wenn details direkt angezeigt wird
-            return html`
-                <div class="plant-details">
-                    <div class="detail-item">
-                        <span class="label">${TranslationUtils.translateField(this._hass, 'strain')}</span>
-                        <span class="value">${this.stateObj.attributes.variety || '-'}</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label">${TranslationUtils.translateField(this._hass, 'feminized')}</span>
-                        <span class="value">${this.stateObj.attributes.feminized || '-'}</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label">${TranslationUtils.translateField(this._hass, 'effects')}</span>
-                        <span class="value">${this.stateObj.attributes.effects || '-'}</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label">${TranslationUtils.translateField(this._hass, 'smell')}</span>
-                        <span class="value">${this.stateObj.attributes.smell || '-'}</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label">${TranslationUtils.translateField(this._hass, 'taste')}</span>
-                        <span class="value">${this.stateObj.attributes.taste || '-'}</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label">${TranslationUtils.translateField(this._hass, 'phenotype')}</span>
-                        <span class="value">${this.stateObj.attributes.phenotype || '-'}</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label">${TranslationUtils.translateField(this._hass, 'hunger')}</span>
-                        <span class="value">${this.stateObj.attributes.hunger || '-'}</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label">${TranslationUtils.translateField(this._hass, 'growth_stretch')}</span>
-                        <span class="value">${this.stateObj.attributes.growth_stretch || '-'}</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label">${TranslationUtils.translateField(this._hass, 'flower_stretch')}</span>
-                        <span class="value">${this.stateObj.attributes.flower_stretch || '-'}</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label">${TranslationUtils.translateField(this._hass, 'mold_resistance')}</span>
-                        <span class="value">${this.stateObj.attributes.mold_resistance || '-'}</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label">${TranslationUtils.translateField(this._hass, 'difficulty')}</span>
-                        <span class="value">${this.stateObj.attributes.difficulty || '-'}</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label">${TranslationUtils.translateField(this._hass, 'yield')}</span>
-                        <span class="value">${this.stateObj.attributes.yield || '-'}</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="label">${TranslationUtils.translateField(this._hass, 'website')}</span>
-                        ${this.stateObj.attributes.website ? html`
-                            <a href="${this.stateObj.attributes.website}" target="_blank" class="value link">${this.stateObj.attributes.website}</a>
-                        ` : html`<span class="value">-</span>`}
-                    </div>
-                    <div class="detail-item">
-                        <span class="label">${TranslationUtils.translateField(this._hass, 'notes')}</span>
-                        <span class="value">${this.stateObj.attributes.notes || '-'}</span>
-                    </div>
-                    <div class="detail-item full-width">
-                        <span class="label">${TranslationUtils.translateField(this._hass, 'infotext1')}</span>
-                        <span class="value">${this.stateObj.attributes.infotext1 || '-'}</span>
-                    </div>
-                    <div class="detail-item full-width">
-                        <span class="label">${TranslationUtils.translateField(this._hass, 'infotext2')}</span>
-                        <span class="value">${this.stateObj.attributes.infotext2 || '-'}</span>
-                    </div>
-                    <div class="detail-item full-width">
-                        <span class="label">${TranslationUtils.translateField(this._hass, 'lineage')}</span>
-                        <span class="value">${this.stateObj.attributes.lineage || '-'}</span>
-                    </div>
-                </div>
-            `;
+            return this._renderDetailFields();
         } else if (this._expanded?.details) {
-            // Wenn details über das Optionsmenü angezeigt wird
             return html`
                 <div class="expanded-content show" data-section="details">
-                    <div class="plant-details">
-                        <div class="detail-item">
-                            <span class="label">${TranslationUtils.translateField(this._hass, 'strain')}</span>
-                            <span class="value">${this.stateObj.attributes.variety || '-'}</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="label">${TranslationUtils.translateField(this._hass, 'feminized')}</span>
-                            <span class="value">${this.stateObj.attributes.feminized || '-'}</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="label">${TranslationUtils.translateField(this._hass, 'effects')}</span>
-                            <span class="value">${this.stateObj.attributes.effects || '-'}</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="label">${TranslationUtils.translateField(this._hass, 'smell')}</span>
-                            <span class="value">${this.stateObj.attributes.smell || '-'}</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="label">${TranslationUtils.translateField(this._hass, 'taste')}</span>
-                            <span class="value">${this.stateObj.attributes.taste || '-'}</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="label">${TranslationUtils.translateField(this._hass, 'phenotype')}</span>
-                            <span class="value">${this.stateObj.attributes.phenotype || '-'}</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="label">${TranslationUtils.translateField(this._hass, 'hunger')}</span>
-                            <span class="value">${this.stateObj.attributes.hunger || '-'}</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="label">${TranslationUtils.translateField(this._hass, 'growth_stretch')}</span>
-                            <span class="value">${this.stateObj.attributes.growth_stretch || '-'}</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="label">${TranslationUtils.translateField(this._hass, 'flower_stretch')}</span>
-                            <span class="value">${this.stateObj.attributes.flower_stretch || '-'}</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="label">${TranslationUtils.translateField(this._hass, 'mold_resistance')}</span>
-                            <span class="value">${this.stateObj.attributes.mold_resistance || '-'}</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="label">${TranslationUtils.translateField(this._hass, 'difficulty')}</span>
-                            <span class="value">${this.stateObj.attributes.difficulty || '-'}</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="label">${TranslationUtils.translateField(this._hass, 'yield')}</span>
-                            <span class="value">${this.stateObj.attributes.yield || '-'}</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="label">${TranslationUtils.translateField(this._hass, 'website')}</span>
-                            ${this.stateObj.attributes.website ? html`
-                                <a href="${this.stateObj.attributes.website}" target="_blank" class="value link">${this.stateObj.attributes.website}</a>
-                            ` : html`<span class="value">-</span>`}
-                        </div>
-                        <div class="detail-item">
-                            <span class="label">${TranslationUtils.translateField(this._hass, 'notes')}</span>
-                            <span class="value">${this.stateObj.attributes.notes || '-'}</span>
-                        </div>
-                        <div class="detail-item full-width">
-                            <span class="label">${TranslationUtils.translateField(this._hass, 'infotext1')}</span>
-                            <span class="value">${this.stateObj.attributes.infotext1 || '-'}</span>
-                        </div>
-                        <div class="detail-item full-width">
-                            <span class="label">${TranslationUtils.translateField(this._hass, 'infotext2')}</span>
-                            <span class="value">${this.stateObj.attributes.infotext2 || '-'}</span>
-                        </div>
-                        <div class="detail-item full-width">
-                            <span class="label">${TranslationUtils.translateField(this._hass, 'lineage')}</span>
-                            <span class="value">${this.stateObj.attributes.lineage || '-'}</span>
-                        </div>
-                    </div>
+                    ${this._renderDetailFields()}
                 </div>
             `;
         }

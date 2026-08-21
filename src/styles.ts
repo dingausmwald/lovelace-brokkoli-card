@@ -684,6 +684,37 @@ export const style = css`
     color: var(--primary-color, #03a9f4);
   }
 
+  /* Bearbeiten-Leiste des Info-Bereichs */
+  .details-actions {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .details-actions ha-icon {
+    cursor: pointer;
+    color: var(--primary-text-color);
+    opacity: 0.7;
+  }
+
+  .details-actions ha-icon:hover {
+    opacity: 1;
+  }
+
+  .detail-edit {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 4px 6px;
+    border: 1px solid var(--divider-color, #e0e0e0);
+    border-radius: 4px;
+    background: var(--card-background-color);
+    color: var(--primary-text-color);
+    font-family: inherit;
+    font-size: inherit;
+    resize: vertical;
+  }
+
   /* ===== Expanded Content Styles ===== */
   .expanded-content {
     display: none;

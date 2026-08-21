@@ -300,7 +300,9 @@
       "no_matching_sensors": "Nie znaleziono pasujących czujników",
       "other_images": "Inne obrazy",
       "back_to_main_images": "Powrót do obrazów głównych",
-      "main_images": "Obrazy główne"
+      "main_images": "Obrazy główne",
+      "edit": "Edytuj",
+      "save": "Zapisz"
     },
     "sensors": {
       "temperature": "Temperatura",

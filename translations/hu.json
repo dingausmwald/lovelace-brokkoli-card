@@ -300,7 +300,9 @@
       "no_matching_sensors": "Nem található megfelelő érzékelő",
       "other_images": "Egyéb képek",
       "back_to_main_images": "Vissza a főképekhez",
-      "main_images": "Főképek"
+      "main_images": "Főképek",
+      "edit": "Szerkesztés",
+      "save": "Mentés"
     },
     "sensors": {
       "temperature": "Hőmérséklet",

@@ -82,7 +82,9 @@
       "legend_rings_mode": "Rings mode",
       "legend_labels_mode": "Labels mode",
       "legend_heatmap_mode": "Heatmap mode",
-      "confirm": "Confirm"
+      "confirm": "Confirm",
+      "edit": "Edit",
+      "save": "Save"
     },
     "fields": {
       "friendly_name": "Name",

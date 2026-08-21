@@ -82,7 +82,9 @@
       "plant_emoji_hint": "Eine große Auswahl findest du auf [emojipedia.org](https://emojipedia.org)",
       "create_plant": "Pflanze erstellen",
       "create": "Erstellen",
-      "no_sensor": "Keiner"
+      "no_sensor": "Keiner",
+      "edit": "Bearbeiten",
+      "save": "Speichern"
     },
     "fields": {
       "friendly_name": "Name",
