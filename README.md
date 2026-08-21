@@ -6,10 +6,11 @@ Lovelace cards for monitoring cannabis plants in Home Assistant. Requires the Br
 
 ## 🌱 Features
 
-### Three Specialized Card Types
+### Four Specialized Card Types
 - **Individual Plant Cards**: Detailed monitoring with sensors, timelines, and consumption tracking
 - **Area Cards**: Interactive spatial plant arrangement with drag & drop positioning
 - **List Cards**: Tabular overview with sorting, filtering, and bulk operations
+- **Sensor Assignment Cards**: Drag & drop assignment of sensors to plants
 
 ### Visualization Features
 - **Sensor Bars**: Display of moisture, temperature, light, conductivity, pH, humidity, and health
@@ -71,6 +72,11 @@ This card requires the **[Brokkoli Cannabis Management](https://github.com/dinga
 1. Add a "Brokkoli List Card" for tabular overview
 2. Enable multi-selection and filtering
 3. Configure cross-card communication with identifiers
+
+### 4. Wire up your sensors
+1. Add a "Brokkoli Sensor Assignment Card" to your dashboard
+2. Drag a device from the left column onto a plant
+3. Click a single type chip to assign only that sensor
 
 ## 📊 Card Types
 
@@ -244,6 +250,43 @@ show_columns:
   notes: false
   cycle: false
   variant: false
+```
+
+### Brokkoli Sensor Assignment Card
+Drag & drop assignment of sensors to plants, in two views.
+
+![image](images/sensor-assignment-flower.jpg)
+
+![image](images/sensor-assignment-list.jpg)
+
+Sources are listed on the left, one row per device or loose entity, with a coloured chip for every sensor type it offers. On the right each plant is either a flower — the plant in the centre, its assigned sources on an orbit, the type icons sitting on the stems — or a row in a list. Drag a source onto a plant to assign it, drag a leaf to another plant to move it, drag it back into the left column to release it. Clicking a single type chip picks just that sensor; the selection survives across sources and is dragged as a whole. Types already taken are skipped rather than overwritten unless the lock button is switched on.
+
+#### Configuration Options
+```yaml
+type: custom:brokkoli-sensor-assignment-card
+title: Sensor assignment       # Optional: card header
+
+# Starting view of the plant column: "flower" or "list".
+# The toggle in the card overrides this for the session only.
+view: flower
+
+# Visible growth phases. Omitted or empty = everything except "removed";
+# harvested plants stay visible on purpose, drying still needs sensors.
+plant_phases:
+  - growing
+  - flowering
+  - harvested
+
+# Visible rooms by area_id. Omitted or empty = every room that holds plants,
+# so rooms added later show up by themselves.
+plant_areas:
+  - blute
+  - wuchs
+
+# Any CSS length or a bare number for pixels. Only needed where the view does
+# not give the card a height of its own (masonry). In sections views the
+# configured row count wins, in panel views the card fills the screen.
+height: 600px
 ```
 
 ## 🎨 Brokkoli Suite Integration
