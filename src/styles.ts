@@ -713,6 +713,15 @@ export const style = css`
     }
   }
 
+  /* Die Attribut-Balken bringen keine eigene Scrollflaeche mit, ihre Tooltips
+     ragen aber nach oben aus dem Container heraus. Mit overflow-x: hidden bzw.
+     overflow-y: auto schnitt der Container sie ab -- kein z-index der Welt
+     hilft dagegen, geclippt ist geclippt. */
+  .expanded-content[data-section="attributes"],
+  .expanded-content.show[data-section="attributes"] {
+    overflow: visible;
+  }
+
   /* Wenn expanded-content das erste Element ist */
   .expanded-content.show:first-child {
     margin-top: 16px;
