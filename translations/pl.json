@@ -224,7 +224,8 @@
       "legend_heatmap_mode_active": "Tryb: Mapa cieplna (kliknij, aby przełączyć)",
       "flowering_past": "Kwitnienie minęło",
       "flowering_to_go": "Kwitnienie pozostało",
-      "days": "Dni"
+      "days": "Dni",
+      "plant_emoji_hint": "Znajdź duży wybór na [emojipedia.org](https://emojipedia.org)"
     },
     "sensors": {},
     "fields": {

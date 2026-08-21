@@ -47,7 +47,8 @@
       "legend_heatmap_mode_active": "Mode: Heatmap (click to switch)",
       "flowering_past": "Flowering past",
       "flowering_to_go": "Flowering remaining",
-      "days": "Days"
+      "days": "Days",
+      "plant_emoji_hint": "Find a large selection at [emojipedia.org](https://emojipedia.org)"
     },
     "fields": {
       "friendly_name": "Name",

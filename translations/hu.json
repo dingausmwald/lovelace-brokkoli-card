@@ -224,7 +224,8 @@
       "legend_heatmap_mode_active": "Mód: Hőtérkép (kattintson a váltáshoz)",
       "flowering_past": "Eltelt virágzás",
       "flowering_to_go": "Hátralévő virágzás",
-      "days": "Napok"
+      "days": "Napok",
+      "plant_emoji_hint": "Nagy választék található az [emojipedia.org](https://emojipedia.org) oldalon"
     },
     "sensors": {},
     "fields": {

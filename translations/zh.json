@@ -224,7 +224,8 @@
       "legend_heatmap_mode_active": "模式：热力图（点击切换）",
       "flowering_past": "已过开花期",
       "flowering_to_go": "剩余开花期",
-      "days": "天"
+      "days": "天",
+      "plant_emoji_hint": "在 [emojipedia.org](https://emojipedia.org) 找到大量选择"
     },
     "sensors": {},
     "fields": {

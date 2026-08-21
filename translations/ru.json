@@ -224,7 +224,8 @@
       "legend_heatmap_mode_active": "Режим: Тепловая карта (нажмите для переключения)",
       "flowering_past": "Цветение прошло",
       "flowering_to_go": "Цветение осталось",
-      "days": "Дни"
+      "days": "Дни",
+      "plant_emoji_hint": "Найдите большой выбор на [emojipedia.org](https://emojipedia.org)"
     },
     "sensors": {},
     "fields": {

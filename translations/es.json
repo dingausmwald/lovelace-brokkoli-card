@@ -224,7 +224,8 @@
       "legend_heatmap_mode_active": "Modo: Mapa de calor (clic para cambiar)",
       "flowering_past": "Floración pasada",
       "flowering_to_go": "Floración restante",
-      "days": "Días"
+      "days": "Días",
+      "plant_emoji_hint": "Encuentra una gran selección en [emojipedia.org](https://emojipedia.org)"
     },
     "sensors": {},
     "fields": {

@@ -78,7 +78,8 @@
       "legend_labels_mode_active": "Modus: Labels (Klick wechselt)",
       "legend_heatmap_mode_active": "Modus: Heatmap (Klick wechselt)",
       "flowering_past": "Bisherige Blüte",
-      "flowering_to_go": "Restliche Blüte"
+      "flowering_to_go": "Restliche Blüte",
+      "plant_emoji_hint": "Eine große Auswahl findest du auf [emojipedia.org](https://emojipedia.org)"
     },
     "fields": {
       "friendly_name": "Name",

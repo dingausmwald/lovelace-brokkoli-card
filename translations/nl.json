@@ -224,7 +224,8 @@
       "legend_heatmap_mode_active": "Modus: Hittekaart (klik om te wisselen)",
       "flowering_past": "Bloei verstreken",
       "flowering_to_go": "Bloei resterend",
-      "days": "Dagen"
+      "days": "Dagen",
+      "plant_emoji_hint": "Vind een grote selectie op [emojipedia.org](https://emojipedia.org)"
     },
     "sensors": {},
     "fields": {

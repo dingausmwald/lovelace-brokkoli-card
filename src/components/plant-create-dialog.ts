@@ -104,6 +104,14 @@ class PlantCreateDialogClass extends LitElement {
     }
   }
 
+  // The integration's hint texts carry a markdown link, and nothing renders
+  // markdown here -- turn it into an <a> ourselves.
+  private _hintWithLink(text: string) {
+    const parts = text.match(/^(.*)\[(.+?)\]\((.+?)\)(.*)$/);
+    if (!parts) return html`${text}`;
+    return html`${parts[1]}<a href="${parts[3]}" target="_blank" rel="noopener">${parts[2]}</a>${parts[4]}`;
+  }
+
   render() {
     if (!this.hass) return html``;
 
@@ -131,8 +139,7 @@ class PlantCreateDialogClass extends LitElement {
               <label for="plant_emoji">Icon</label>
               <input type="text" id="plant_emoji" name="plant_emoji" value="🥦">
               <div class="field-hint">
-                Wandert an das Ende des Namens. Eine große Auswahl findest du auf
-                <a href="https://emojipedia.org" target="_blank" rel="noopener">emojipedia.org</a>
+                ${this._hintWithLink(TranslationUtils.translateUI(this.hass, 'plant_emoji_hint'))}
               </div>
             </div>
             <div class="form-field">
