@@ -617,7 +617,7 @@ export class BrokkoliArea extends LitElement {
           } else if (sensorData) {
             // Normale Sensoren (einschließlich Nullwerte)
             // Wir prüfen jetzt explizit, ob sensorData existiert, nicht ob current definiert ist
-            const currentValue = Number(sensorData.current || 0);
+            const currentValue = this._liveCurrent(sensorData) ?? Number(sensorData.current || 0);
             const minValue = Number(sensorData.min || 0);
             const maxValue = Number(sensorData.max || 100);
             
@@ -736,6 +736,18 @@ export class BrokkoliArea extends LitElement {
     });
   }
   
+  // Der Messwert kommt live aus hass.states, nicht aus dem get_info-Schnappschuss.
+  // Der Schnappschuss ist Sekunden bis Minuten alt und ueberdauerte eine
+  // Neuzuweisung des Sensors: danach erschien wieder der Wert der alten Quelle,
+  // bis irgendwann neu geladen wurde. Grenzwerte, Icons und Einheiten kommen
+  // weiterhin aus dem Schnappschuss, die aendern sich selten.
+  private _liveCurrent(sensorData?: SensorData): number | undefined {
+    const zustand = sensorData?.sensor ? this.hass?.states[sensorData.sensor]?.state : undefined;
+    if (zustand === undefined || zustand === 'unknown' || zustand === 'unavailable') return undefined;
+    const zahl = Number(zustand);
+    return Number.isNaN(zahl) ? undefined : zahl;
+  }
+
   // Rendert Sensorringe für eine Pflanze basierend auf den plant/get_info Daten
   private _renderPlantSensorRings(entityId: string): TemplateResult {
     const plantInfo = this._plantInfoCache[entityId];
@@ -816,7 +828,7 @@ export class BrokkoliArea extends LitElement {
     }
     
     // Extrahiere die Werte aus den Sensordaten
-    const current = Number(sensorData.current);
+    const current = this._liveCurrent(sensorData) ?? Number(sensorData.current);
     const min = Number(sensorData.min);
     const max = Number(sensorData.max);
     
@@ -2636,7 +2648,7 @@ export class BrokkoliArea extends LitElement {
       <div class="sensor-labels">
         ${sensorData.map(sensor => {
           // Bestimme den Status des Sensors
-          const current = Number(sensor.current);
+          const current = this._liveCurrent(sensor as SensorData) ?? Number(sensor.current);
           const min = Number(sensor.min);
           const max = Number(sensor.max);
           
