@@ -11,6 +11,60 @@ export class PlantEntityUtils {
     // Timestamp of last update per plant
     private static _plantLastLoaded: Record<string, number> = {};
 
+    // Uebersetzt die translation_keys der Integration auf die Feld-IDs der Karten.
+    private static readonly TK_ALIAS: Record<string, string> = {
+        current_moisture: 'soil_moisture',
+        current_temperature: 'temperature',
+        current_conductivity: 'conductivity',
+        current_illuminance: 'illuminance',
+        current_humidity: 'air_humidity',
+        current_ph: 'ph',
+        current_ppfd: 'ppfd_mol',
+        current_power_consumption: 'power_consumption',
+        moisture_consumption: 'water_consumption',
+    };
+
+    // Bei den Grenzwerten zaehlt nur der Typ hinter min_/max_.
+    private static readonly TYPE_ALIAS: Record<string, string> = {
+        moisture: 'soil_moisture',
+        humidity: 'air_humidity',
+    };
+
+    /**
+     * Ordnet einer Pflanze ihre Entities zu -- Messwerte, Grenzwerte, Helfer.
+     *
+     * Die Zuordnung steht bereits in der Entity-Registry: jede Entity haengt an
+     * der device_id der Pflanze und traegt einen translation_key, der von der
+     * Sprache der Installation unabhaengig ist. Aus Entity-IDs etwas
+     * zusammenzubauen ("number.<pflanze>_max_bodenfeuchte") funktioniert nur auf
+     * deutschen Systemen, und der get_info-Schnappschuss kennt die Grenzwert-
+     * Entities gar nicht, nur ihre Zahlen.
+     *
+     * Abgelegt wird unter beiden Namen: unter dem translation_key selbst und
+     * unter der Feld-ID der Karten, damit beide Seiten nachschlagen koennen.
+     */
+    static buildSensorMap(hass: HomeAssistant, plantEntityId: string): Record<string, string> {
+        const registry = (hass as unknown as {
+            entities?: Record<string, { entity_id: string; device_id?: string; translation_key?: string }>;
+        })?.entities;
+        const deviceId = registry?.[plantEntityId]?.device_id;
+        if (!registry || !deviceId) return {};
+
+        const map: Record<string, string> = {};
+        for (const eintrag of Object.values(registry)) {
+            if (eintrag.device_id !== deviceId || !eintrag.translation_key) continue;
+
+            const grenze = eintrag.translation_key.match(/^(min|max)_(.+)$/);
+            const feldId = grenze
+                ? `${grenze[1]}_${this.TYPE_ALIAS[grenze[2]] ?? grenze[2]}`
+                : (this.TK_ALIAS[eintrag.translation_key] ?? eintrag.translation_key);
+
+            map[eintrag.translation_key] = eintrag.entity_id;
+            map[feldId] = eintrag.entity_id;
+        }
+        return map;
+    }
+
     static async getPlantInfo(hass: HomeAssistant, plantEntityId: string): Promise<unknown> {
         // If data is in cache, use it
         if (this._plantInfoCache[plantEntityId]) {

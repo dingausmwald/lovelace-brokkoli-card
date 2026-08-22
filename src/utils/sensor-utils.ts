@@ -101,6 +101,22 @@ export class SensorUtils {
     }
 
     static getSensorThresholds(hass: HomeAssistant, plant: HomeAssistantEntity, columnId: string): { min: number; max: number } {
+        // Grenzwerte sind eigene number-Entities. Sind sie auffindbar, zaehlen
+        // sie -- der API-Schnappschuss traegt nur ihre Zahlen und ist so alt wie
+        // der letzte Abruf.
+        const minEntityId = getSensorMapEntityId(plant, `min_${columnId}`);
+        const maxEntityId = getSensorMapEntityId(plant, `max_${columnId}`);
+
+        if (minEntityId && maxEntityId &&
+            hass.states[minEntityId]?.state !== undefined &&
+            hass.states[minEntityId]?.state !== 'unavailable' &&
+            hass.states[maxEntityId]?.state !== 'unavailable') {
+            return {
+                min: Number(hass.states[minEntityId].state) || 0,
+                max: Number(hass.states[maxEntityId].state) || 100
+            };
+        }
+
         // Check if we have API info
         if (plant.attributes._apiInfo) {
             const apiInfo = plant.attributes._apiInfo as ApiInfo;
@@ -125,18 +141,6 @@ export class SensorUtils {
             }
         }
         
-        // Check if we have a sensor map for the min/max helpers
-        const minEntityId = getSensorMapEntityId(plant, `min_${columnId}`);
-        const maxEntityId = getSensorMapEntityId(plant, `max_${columnId}`);
-        
-        if (minEntityId && maxEntityId && 
-            hass.states[minEntityId]?.state !== 'unavailable' && 
-            hass.states[maxEntityId]?.state !== 'unavailable') {
-            return {
-                min: Number(hass.states[minEntityId].state) || 0,
-                max: Number(hass.states[maxEntityId].state) || 100
-            };
-        }
         
         // Default values if nothing was found
         return { min: 0, max: 100 };

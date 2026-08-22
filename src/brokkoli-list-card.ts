@@ -118,7 +118,7 @@ export default class BrokkoliListCard extends LitElement {
             const apiInfo = await PlantEntityUtils.getPlantInfo(this._hass, plant.entity_id);
             
             // Entity mit aktuellen Daten aktualisieren
-            const sensorMap = this._buildSensorMap(apiInfo);
+            const sensorMap = this._buildSensorMap(apiInfo, plant.entity_id);
             
             this.plantEntities[i] = {
                 ...currentEntity,
@@ -133,10 +133,10 @@ export default class BrokkoliListCard extends LitElement {
         this.requestUpdate();
     }
     
-    // Hilfsmethode zum Erstellen der Sensor-Map aus API-Infos
+    // Hilfsmethode zum Erstellen der Sensor-Map aus API-Infos und Registry
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private _buildSensorMap(apiInfo: any): Record<string, string> {
-        if (!apiInfo) return {};
+    private _buildSensorMap(apiInfo: any, plantEntityId: string): Record<string, string> {
+        if (!apiInfo) return PlantEntityUtils.buildSensorMap(this._hass!, plantEntityId);
         
         const sensorMap: Record<string, string> = {};
         
@@ -188,8 +188,12 @@ export default class BrokkoliListCard extends LitElement {
                 }
             }
         }
-        
-        return sensorMap;
+
+        // Die Registry kennt zusaetzlich die Grenzwert-Entities (min_/max_), die
+        // in der get_info-Antwort nur als Zahlen stehen -- und sie ordnet alles
+        // sprachneutral ueber den translation_key zu. Was sie nicht abdeckt
+        // (Entities ohne translation_key), bleibt aus der API-Antwort stehen.
+        return { ...sensorMap, ...PlantEntityUtils.buildSensorMap(this._hass!, plantEntityId) };
     }
 
     private async updatePlantEntities(): Promise<void> {
@@ -213,7 +217,7 @@ export default class BrokkoliListCard extends LitElement {
                 const apiInfo = await PlantEntityUtils.getPlantInfo(this._hass, plant.entity_id);
                 
                 // Sensor-Map erstellen
-                const sensorMap = this._buildSensorMap(apiInfo);
+                const sensorMap = this._buildSensorMap(apiInfo, plant.entity_id);
                 
                 // Klonen der Plant-Entity und anreichern mit den Sensor-IDs
                 const enrichedPlant = {
