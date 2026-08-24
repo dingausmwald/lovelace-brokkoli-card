@@ -5,6 +5,7 @@ import { PlantEntityUtils } from '../utils/plant-entity-utils';
 import { FilterUtils } from '../utils/filter-utils';
 import { HomeAssistantEntity } from '../types/brokkoli-list-card-types';
 import { plantFlyoutMenuStyles } from '../styles/plant-flyout-menu-styles';
+import './plant-clone-dialog';
 
 interface HassEntity {
   attributes: {
@@ -26,7 +27,6 @@ export class PlantFlyoutMenu extends LitElement {
   @state() private _filteredPlants: HomeAssistantEntity[] = [];
   @state() private _showCloneDialog = false;
   @state() private _selectedPlantForClone?: HomeAssistantEntity;
-  @state() private _cloneData: Record<string, string> = {};
 
   connectedCallback() {
     super.connectedCallback();
@@ -74,79 +74,33 @@ export class PlantFlyoutMenu extends LitElement {
     }));
   }
 
-  /** First free name of the form "<source> <n>". */
-  private _nextCloneName(base: string): string {
-    const taken = new Set(this._plants.map(p => p.attributes.friendly_name));
-    let n = 1;
-    while (taken.has(`${base} ${n}`)) n++;
-    return `${base} ${n}`;
-  }
-
   private _handleClonePlant(plant: HomeAssistantEntity) {
     this._selectedPlantForClone = plant;
-    const base = String(plant.attributes.friendly_name || plant.entity_id);
-    this._cloneData = {
-      name: this._nextCloneName(base),
-      temperature_sensor: '',
-      moisture_sensor: '',
-      conductivity_sensor: '',
-      illuminance_sensor: '',
-      humidity_sensor: '',
-      power_consumption_sensor: '',
-      ph_sensor: ''
-    };
     this._showCloneDialog = true;
   }
 
-  private async _executeClone() {
-    if (!this.hass || !this._selectedPlantForClone) return;
-
-    try {
-      // Nicht gesetzte Sensorfelder sind leere Strings und damit keine
-      // gueltigen Entity-IDs -- das Service-Schema lehnt den ganzen Aufruf ab
-      // ("Entity ID is an invalid entity ID for dictionary value").
-      const angaben = Object.fromEntries(
-        Object.entries(this._cloneData).filter(([, v]) => v !== '' && v != null)
-      );
-
-      // Die Service-Antwort traegt entity_id und device_id des Klons. Ohne sie
-      // kann ihn niemand positionieren oder dem Raum zuordnen -- deshalb landete
-      // ein Klon bisher nirgends. callService reicht Antworten nicht durch.
-      const antwort = await this.hass.callWS({
-        type: 'call_service',
-        domain: 'plant',
-        service: 'clone_plant',
-        service_data: {
-          source_entity_id: this._selectedPlantForClone.entity_id,
-          ...angaben
-        },
-        return_response: true
-      }) as { response?: { entity_id?: string; device_id?: string } };
-
-      this.dispatchEvent(new CustomEvent('plant-cloned', {
-        bubbles: true,
-        composed: true,
-        detail: {
-          source_entity_id: this._selectedPlantForClone.entity_id,
-          entity_id: antwort?.response?.entity_id,
-          device_id: antwort?.response?.device_id,
-          position: this.targetPosition,
-          areaId: this.areaId
-        }
-      }));
-
-      this._closeCloneDialog();
-      this._closeMenu();
-    } catch (error) {
-      console.error('Error cloning plant:', error);
-    }
+  // Der Dialog meldet den fertigen Klon; Position und Raum kennt nur die Karte,
+  // deshalb wird das Ereignis hier angereichert weitergereicht.
+  private _handlePlantCloned(e: CustomEvent) {
+    e.stopPropagation();
+    this.dispatchEvent(new CustomEvent('plant-cloned', {
+      bubbles: true,
+      composed: true,
+      detail: {
+        ...e.detail,
+        position: this.targetPosition,
+        areaId: this.areaId
+      }
+    }));
+    this._closeCloneDialog();
+    this._closeMenu();
   }
 
   private _closeCloneDialog() {
     this._showCloneDialog = false;
     this._selectedPlantForClone = undefined;
-    this._cloneData = {};
   }
+
 
   private _closeMenu() {
     this.dispatchEvent(new CustomEvent('menu-closed', {
@@ -245,211 +199,16 @@ export class PlantFlyoutMenu extends LitElement {
         </div>
       </div>
 
-      ${this._showCloneDialog ? this._renderCloneDialog() : ''}
+      ${this._showCloneDialog && this._selectedPlantForClone ? html`
+        <plant-clone-dialog
+          .hass=${this.hass}
+          .plant=${this._selectedPlantForClone}
+          @dialog-closed=${this._closeCloneDialog}
+          @plant-cloned=${this._handlePlantCloned}
+        ></plant-clone-dialog>
+      ` : ''}
     `;
   }
-
-  private _renderCloneDialog() {
-    return html`
-      <div class="plant-clone-dialog-backdrop" @click=${(e: Event) => e.stopPropagation()}>
-        <div class="plant-clone-dialog" @click=${(e: Event) => e.stopPropagation()}>
-          <div class="plant-clone-dialog-header">
-            <h2 class="plant-clone-dialog-title">Pflanze klonen</h2>
-            <button class="plant-clone-dialog-close" @click=${this._closeCloneDialog}>×</button>
-          </div>
-          
-          <div class="plant-clone-dialog-content">
-            <form class="plant-clone-dialog-form" @submit=${(e: Event) => { e.preventDefault(); this._executeClone(); }}>
-              <div class="plant-clone-dialog-field">
-                <label class="plant-clone-dialog-label" for="clone-name">Name</label>
-                <input 
-                  type="text" 
-                  id="clone-name" 
-                  class="plant-clone-dialog-input"
-                  .value=${this._cloneData.name || ''}
-                  @input=${(e: Event) => this._cloneData.name = (e.target as HTMLInputElement).value}
-                  required
-                >
-              </div>
-
-              <div class="plant-clone-dialog-field">
-                <label class="plant-clone-dialog-label" for="clone-temp">Temperatursensor</label>
-                <select 
-                  id="clone-temp" 
-                  class="plant-clone-dialog-input"
-                  .value=${this._cloneData.temperature_sensor || ''}
-                  @change=${(e: Event) => this._cloneData.temperature_sensor = (e.target as HTMLSelectElement).value}
-                >
-                  <option value="">Keiner</option>
-                  ${Object.entries(this.hass?.states || {})
-                    .filter(([id, entity]) => {
-                      const hassEntity = entity as HassEntity;
-                      return id.startsWith('sensor.') && 
-                        hassEntity.attributes && 
-                        hassEntity.attributes.device_class === 'temperature';
-                    })
-                    .map(([id, entity]) => {
-                      const hassEntity = entity as HassEntity;
-                      return html`<option value="${id}">${hassEntity.attributes.friendly_name || id}</option>`;
-                    })
-                  }
-                </select>
-              </div>
-
-              <div class="plant-clone-dialog-field">
-                <label class="plant-clone-dialog-label" for="clone-moisture">Feuchtigkeitssensor</label>
-                <select 
-                  id="clone-moisture" 
-                  class="plant-clone-dialog-input"
-                  .value=${this._cloneData.moisture_sensor || ''}
-                  @change=${(e: Event) => this._cloneData.moisture_sensor = (e.target as HTMLSelectElement).value}
-                >
-                  <option value="">Keiner</option>
-                  ${Object.entries(this.hass?.states || {})
-                    .filter(([id, entity]) => {
-                      const hassEntity = entity as HassEntity;
-                      return id.startsWith('sensor.') && 
-                        hassEntity.attributes && 
-                        hassEntity.attributes.device_class === 'moisture';
-                    })
-                    .map(([id, entity]) => {
-                      const hassEntity = entity as HassEntity;
-                      return html`<option value="${id}">${hassEntity.attributes.friendly_name || id}</option>`;
-                    })
-                  }
-                </select>
-              </div>
-
-              <div class="plant-clone-dialog-field">
-                <label class="plant-clone-dialog-label" for="clone-conductivity">Leitfähigkeitssensor</label>
-                <select 
-                  id="clone-conductivity" 
-                  class="plant-clone-dialog-input"
-                  .value=${this._cloneData.conductivity_sensor || ''}
-                  @change=${(e: Event) => this._cloneData.conductivity_sensor = (e.target as HTMLSelectElement).value}
-                >
-                  <option value="">Keiner</option>
-                  ${Object.entries(this.hass?.states || {})
-                    .filter(([id, entity]) => {
-                      const hassEntity = entity as HassEntity;
-                      return id.startsWith('sensor.') && 
-                        hassEntity.attributes && 
-                        hassEntity.attributes.device_class === 'conductivity';
-                    })
-                    .map(([id, entity]) => {
-                      const hassEntity = entity as HassEntity;
-                      return html`<option value="${id}">${hassEntity.attributes.friendly_name || id}</option>`;
-                    })
-                  }
-                </select>
-              </div>
-
-              <div class="plant-clone-dialog-field">
-                <label class="plant-clone-dialog-label" for="clone-illuminance">Helligkeitssensor</label>
-                <select 
-                  id="clone-illuminance" 
-                  class="plant-clone-dialog-input"
-                  .value=${this._cloneData.illuminance_sensor || ''}
-                  @change=${(e: Event) => this._cloneData.illuminance_sensor = (e.target as HTMLSelectElement).value}
-                >
-                  <option value="">Keiner</option>
-                  ${Object.entries(this.hass?.states || {})
-                    .filter(([id, entity]) => {
-                      const hassEntity = entity as HassEntity;
-                      return id.startsWith('sensor.') && 
-                        hassEntity.attributes && 
-                        hassEntity.attributes.device_class === 'illuminance';
-                    })
-                    .map(([id, entity]) => {
-                      const hassEntity = entity as HassEntity;
-                      return html`<option value="${id}">${hassEntity.attributes.friendly_name || id}</option>`;
-                    })
-                  }
-                </select>
-              </div>
-
-              <div class="plant-clone-dialog-field">
-                <label class="plant-clone-dialog-label" for="clone-humidity">Luftfeuchtigkeitssensor</label>
-                <select 
-                  id="clone-humidity" 
-                  class="plant-clone-dialog-input"
-                  .value=${this._cloneData.humidity_sensor || ''}
-                  @change=${(e: Event) => this._cloneData.humidity_sensor = (e.target as HTMLSelectElement).value}
-                >
-                  <option value="">Keiner</option>
-                  ${Object.entries(this.hass?.states || {})
-                    .filter(([id, entity]) => {
-                      const hassEntity = entity as HassEntity;
-                      return id.startsWith('sensor.') && 
-                        hassEntity.attributes && 
-                        hassEntity.attributes.device_class === 'humidity';
-                    })
-                    .map(([id, entity]) => {
-                      const hassEntity = entity as HassEntity;
-                      return html`<option value="${id}">${hassEntity.attributes.friendly_name || id}</option>`;
-                    })
-                  }
-                </select>
-              </div>
-
-              <div class="plant-clone-dialog-field">
-                <label class="plant-clone-dialog-label" for="clone-power">Energieverbrauchssensor</label>
-                <select 
-                  id="clone-power" 
-                  class="plant-clone-dialog-input"
-                  .value=${this._cloneData.power_consumption_sensor || ''}
-                  @change=${(e: Event) => this._cloneData.power_consumption_sensor = (e.target as HTMLSelectElement).value}
-                >
-                  <option value="">Keiner</option>
-                  ${Object.entries(this.hass?.states || {})
-                    .filter(([id, entity]) => {
-                      const hassEntity = entity as HassEntity;
-                      return id.startsWith('sensor.') && 
-                        hassEntity.attributes && 
-                        hassEntity.attributes.device_class === 'energy';
-                    })
-                    .map(([id, entity]) => {
-                      const hassEntity = entity as HassEntity;
-                      return html`<option value="${id}">${hassEntity.attributes.friendly_name || id}</option>`;
-                    })
-                  }
-                </select>
-              </div>
-
-              <div class="plant-clone-dialog-field">
-                <label class="plant-clone-dialog-label" for="clone-ph">pH-Sensor</label>
-                <select 
-                  id="clone-ph" 
-                  class="plant-clone-dialog-input"
-                  .value=${this._cloneData.ph_sensor || ''}
-                  @change=${(e: Event) => this._cloneData.ph_sensor = (e.target as HTMLSelectElement).value}
-                >
-                  <option value="">Keiner</option>
-                  ${Object.entries(this.hass?.states || {})
-                    .filter(([id, entity]) => {
-                      const hassEntity = entity as HassEntity;
-                      return id.startsWith('sensor.') && 
-                        hassEntity.attributes && 
-                        hassEntity.attributes.device_class === 'ph';
-                    })
-                    .map(([id, entity]) => {
-                      const hassEntity = entity as HassEntity;
-                      return html`<option value="${id}">${hassEntity.attributes.friendly_name || id}</option>`;
-                    })
-                  }
-                </select>
-              </div>
-
-              <div class="plant-clone-dialog-actions">
-                <button type="button" class="plant-clone-dialog-button secondary" @click=${this._closeCloneDialog}>Abbrechen</button>
-                <button type="submit" class="plant-clone-dialog-button primary">Klonen</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-    `;
-    }
 
   static styles = plantFlyoutMenuStyles;
 }  

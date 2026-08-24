@@ -8,6 +8,8 @@ import { renderAttributes, renderBattery } from './utils/attributes';
 import { CARD_EDITOR_NAME, CARD_NAME, default_show_bars, default_show_elements, default_option_elements, initial_expanded_options, missingImage, getGrowthPhaseIcon } from './utils/constants';
 import { moreInfo } from './utils/utils';
 import { TranslationUtils } from './utils/translation-utils';
+import { getSourceSensors } from './utils/sensor-source-utils';
+import './components/plant-clone-dialog';
 import './components/gallery';
 import './components/timeline';
 import './components/graph';
@@ -588,14 +590,6 @@ export default class BrokkoliCard extends LitElement {
         this._showPlantDropdown = false;
     }
 
-    private async _handleClonePlant() {
-        await this._hass.callService('plant', 'clone_plant', {
-            source_entity_id: this.stateObj.entity_id,
-            ...this._popupData
-        });
-        this._closePopup();
-    }
-
     private async _handleMoveToCycle() {
         await this._hass.callService('plant', 'move_to_cycle', {
             plant_entity: this.stateObj.entity_id,
@@ -646,7 +640,16 @@ export default class BrokkoliCard extends LitElement {
 
         switch (this._activePopup) {
             case 'clone':
-                return this._renderClonePopup();
+                // Gemeinsamer Dialog beider Karten -- hier lagen vorher
+                // Freitextfelder, in die man Entity-IDs tippen musste.
+                return html`
+                    <plant-clone-dialog
+                        .hass="${this._hass}"
+                        .plant="${this.stateObj}"
+                        @dialog-closed="${this._closePopup}"
+                        @plant-cloned="${this._closePopup}"
+                    ></plant-clone-dialog>
+                `;
             case 'move':
                 return this._renderMovePopup();
             case 'remove':
@@ -656,55 +659,6 @@ export default class BrokkoliCard extends LitElement {
             default:
                 return html``;
         }
-    }
-
-    private _renderClonePopup(): TemplateResult {
-        return html`
-            <div class="popup-dialog" @click="${this._closePopup}">
-                <div class="popup-content" @click="${(e: Event) => e.stopPropagation()}">
-                    <div class="popup-title">${TranslationUtils.translateUI(this._hass, 'clone_plant')}</div>
-                    <div class="form-field">
-                        <label>${TranslationUtils.translateField(this._hass, 'friendly_name')}</label>
-                        <input type="text" .value="${this._popupData.name || ''}"
-                               @input="${(e: InputEvent) => this._popupData.name = (e.target as HTMLInputElement).value}">
-                    </div>
-                    <div class="form-field">
-                        <label>${TranslationUtils.translateSensor(this._hass, 'temperature')}</label>
-                        <input type="text" .value="${this._popupData.temperature_sensor || ''}"
-                               @input="${(e: InputEvent) => this._popupData.temperature_sensor = (e.target as HTMLInputElement).value}">
-                    </div>
-                    <div class="form-field">
-                        <label>${TranslationUtils.translateSensor(this._hass, 'soil_moisture')}</label>
-                        <input type="text" .value="${this._popupData.moisture_sensor || ''}"
-                               @input="${(e: InputEvent) => this._popupData.moisture_sensor = (e.target as HTMLInputElement).value}">
-                    </div>
-                    <div class="form-field">
-                        <label>${TranslationUtils.translateSensor(this._hass, 'illuminance')}</label>
-                        <input type="text" .value="${this._popupData.illuminance_sensor || ''}"
-                               @input="${(e: InputEvent) => this._popupData.illuminance_sensor = (e.target as HTMLInputElement).value}">
-                    </div>
-                    <div class="form-field">
-                        <label>${TranslationUtils.translateSensor(this._hass, 'air_humidity')}</label>
-                        <input type="text" .value="${this._popupData.humidity_sensor || ''}"
-                               @input="${(e: InputEvent) => this._popupData.humidity_sensor = (e.target as HTMLInputElement).value}">
-                    </div>
-                    <div class="form-field">
-                        <label>${TranslationUtils.translateSensor(this._hass, 'conductivity')}</label>
-                        <input type="text" .value="${this._popupData.conductivity_sensor || ''}"
-                               @input="${(e: InputEvent) => this._popupData.conductivity_sensor = (e.target as HTMLInputElement).value}">
-                    </div>
-                    <div class="form-field">
-                        <label>${TranslationUtils.translateSensor(this._hass, 'total_power_consumption')}</label>
-                        <input type="text" .value="${this._popupData.power_consumption_sensor || ''}"
-                               @input="${(e: InputEvent) => this._popupData.power_consumption_sensor = (e.target as HTMLInputElement).value}">
-                    </div>
-                    <div class="popup-buttons">
-                        <button @click="${this._closePopup}">${TranslationUtils.translateUI(this._hass, 'cancel')}</button>
-                        <button @click="${this._handleClonePlant}">${TranslationUtils.translateUI(this._hass, 'clone')}</button>
-                    </div>
-                </div>
-            </div>
-        `;
     }
 
     private _renderMovePopup(): TemplateResult {
@@ -784,44 +738,9 @@ export default class BrokkoliCard extends LitElement {
                 : undefined;
         }
 
-        // Filtere verfügbare Source-Sensoren nach Typ.
-        // Plant-Integration-eigene Sensoren erkennt man am `external_sensor`-Attribut —
-        // sprachneutral, weil unabhängig vom entity_id-Slug.
-        const getSensorsByType = (type: string): Array<{entity_id: string, name: string}> => {
-            return Object.entries(this._hass.states)
-                .filter(([entity_id, state]: [string, HomeAssistantEntity]) => {
-                    if (!entity_id.startsWith('sensor.')) return false;
-                    // Plant-Integration-Sensoren rauswerfen (egal welche Pflanze).
-                    if (state.attributes && 'external_sensor' in state.attributes) return false;
-                    return true;
-                })
-                .filter(([, state]: [string, HomeAssistantEntity]) => {
-                    const deviceClass = state.attributes?.device_class;
-                    const unit = state.attributes?.unit_of_measurement;
-                    switch(type) {
-                        case 'temperature':
-                            return deviceClass === 'temperature' || unit === '°C' || unit === '°F';
-                        case 'moisture':
-                            return deviceClass === 'moisture' || (deviceClass === 'humidity' && unit === '%');
-                        case 'illuminance':
-                            return deviceClass === 'illuminance' || unit === 'lx' || unit === 'lm';
-                        case 'humidity':
-                            return deviceClass === 'humidity' || unit === '%';
-                        case 'conductivity':
-                            return deviceClass === 'conductivity' || unit === 'µS/cm' || unit === 'mS/cm';
-                        case 'power_consumption':
-                            return deviceClass === 'power' ||
-                                   deviceClass === 'energy' ||
-                                   unit === 'W' || unit === 'kW' || unit === 'kWh' || unit === 'Wh';
-                        default:
-                            return false;
-                    }
-                })
-                .map(([entity_id, state]: [string, HomeAssistantEntity]) => ({
-                    entity_id,
-                    name: state.attributes?.friendly_name || entity_id
-                }));
-        };
+        // Welche Entities als Quelle taugen, entscheidet fuer beide Dialoge
+        // dieselbe Funktion -- die Filterliste stand vorher zweimal im Code.
+        const getSensorsByType = (type: string) => getSourceSensors(this._hass, type);
 
         return html`
             <div class="popup-dialog" @click="${this._closePopup}">
