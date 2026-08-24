@@ -6,6 +6,15 @@ import { css } from 'lit';
  * dieselbe Aktion je nach Karte anders aussah.
  */
 export const dialogStyles = css`
+    /* Das Flyout-Menue der Area-Card setzt auf seinem :host pointer-events: none
+       und schaltet sie nur fuer die eigenen Elemente wieder an. Ein Dialog, der
+       darin gerendert wird, erbt das und ist unbedienbar: sichtbar, aber kein
+       Klick kommt an -- kein Fehler, kein Klon. Jeder Dialog holt sie sich hier
+       selbst zurueck, unabhaengig davon, wer ihn einbettet. */
+    :host {
+        pointer-events: auto;
+    }
+
     .backdrop {
         position: fixed;
         inset: 0;
