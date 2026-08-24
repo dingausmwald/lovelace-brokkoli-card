@@ -90,6 +90,12 @@ export const dialogStyles = css`
         font-size: 1rem;
     }
 
+    .names {
+        margin: 0;
+        font-weight: 500;
+        overflow-wrap: anywhere;
+    }
+
     .actions {
         display: flex;
         justify-content: flex-end;

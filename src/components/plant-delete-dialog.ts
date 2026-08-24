@@ -62,8 +62,10 @@ class PlantDeleteDialogClass extends LitElement {
                         <button class="close" @click=${this._close}>×</button>
                     </div>
                     <div class="body">
-                        <p><strong>${namen.join(', ')}</strong></p>
-                        <p>${TranslationUtils.translateUI(this.hass, 'delete_plant_confirmation')}</p>
+                        <!-- Was Loeschen bedeutet, weiss jeder; der Dialog nennt nur,
+                             was es trifft. Der erklaerende Satz machte das Fenster
+                             unnoetig breit. -->
+                        <p class="names">${namen.join(', ')}</p>
                         <div class="actions">
                             <button class="secondary" @click=${this._close}>
                                 ${TranslationUtils.translateUI(this.hass, 'cancel')}
