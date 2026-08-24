@@ -303,7 +303,8 @@
       "main_images": "Imagens principais",
       "edit": "Editar",
       "save": "Guardar",
-      "legend_collapsed_mode_active": "Modo: Recolhido (clica para mudar)"
+      "legend_collapsed_mode_active": "Modo: Recolhido (clica para mudar)",
+      "delete_selected": "Eliminar selecionadas"
     },
     "sensors": {
       "temperature": "Temperatura",

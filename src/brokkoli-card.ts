@@ -10,6 +10,8 @@ import { moreInfo } from './utils/utils';
 import { TranslationUtils } from './utils/translation-utils';
 import { getSourceSensors } from './utils/sensor-source-utils';
 import './components/plant-clone-dialog';
+import './components/plant-replace-sensors-dialog';
+import './components/plant-delete-dialog';
 import './components/gallery';
 import './components/timeline';
 import './components/graph';
@@ -598,37 +600,6 @@ export default class BrokkoliCard extends LitElement {
         this._closePopup();
     }
 
-    private async _handleRemovePlant() {
-        await this._hass.callService('plant', 'remove_plant', {
-            plant_entity: this.stateObj.entity_id
-        });
-        this._closePopup();
-    }
-
-    private async _handleReplaceSensors() {
-        const sensorTypes = ['temperature', 'moisture', 'illuminance', 'humidity', 'conductivity', 'power_consumption'];
-        // Source-Sensor-entity_ids aus plant/get_info (sprachneutral) statt sensor.X_TYPE Konstruktion.
-        const plantInfoResult = (this.plantinfo as { result?: Record<string, { sensor?: string } | undefined> & { diagnostic_sensors?: Record<string, { entity_id?: string }> } })?.result;
-        const plantData = (plantInfoResult ?? {}) as Record<string, { sensor?: string }>;
-        const diagSensors = plantInfoResult?.diagnostic_sensors ?? {};
-
-        for (const type of sensorTypes) {
-            const newSensor = this._popupData[`new_${type}_sensor`];
-            // power_consumption: replace_external_sensor sitzt auf der TOTAL-Entity.
-            const currentSensor = type === 'power_consumption'
-                ? diagSensors.total_power_consumption?.entity_id
-                : plantData[type]?.sensor;
-
-            if (newSensor && currentSensor) {
-                await this._hass.callService('plant', 'replace_sensor', {
-                    meter_entity: currentSensor,
-                    new_sensor: newSensor
-                });
-            }
-        }
-        this._closePopup();
-    }
-
     private _closePopup() {
         this._activePopup = null;
         this._popupData = {};
@@ -653,9 +624,21 @@ export default class BrokkoliCard extends LitElement {
             case 'move':
                 return this._renderMovePopup();
             case 'remove':
-                return this._renderRemovePopup();
+                return html`
+                    <plant-delete-dialog
+                        .hass="${this._hass}"
+                        .plant="${this.stateObj}"
+                        @dialog-closed="${this._closePopup}"
+                    ></plant-delete-dialog>
+                `;
             case 'replace':
-                return this._renderReplacePopup();
+                return html`
+                    <plant-replace-sensors-dialog
+                        .hass="${this._hass}"
+                        .plant="${this.stateObj}"
+                        @dialog-closed="${this._closePopup}"
+                    ></plant-replace-sensors-dialog>
+                `;
             default:
                 return html``;
         }
@@ -687,95 +670,6 @@ export default class BrokkoliCard extends LitElement {
                         <button @click="${this._handleMoveToCycle}" ?disabled="${!this._popupData.cycle_entity}">
                             ${TranslationUtils.translateUI(this._hass, 'move')}
                         </button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    private _renderRemovePopup(): TemplateResult {
-        return html`
-            <div class="popup-dialog" @click="${this._closePopup}">
-                <div class="popup-content" @click="${(e: Event) => e.stopPropagation()}">
-                    <div class="popup-title">${TranslationUtils.translateUI(this._hass, 'delete_plant')}</div>
-                    <p>${TranslationUtils.translateUI(this._hass, 'delete_plant_confirmation')}</p>
-                    <div class="popup-buttons">
-                        <button @click="${this._closePopup}">${TranslationUtils.translateUI(this._hass, 'cancel')}</button>
-                        <button @click="${this._handleRemovePlant}" class="danger">
-                            ${TranslationUtils.translateUI(this._hass, 'confirm_delete')}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    private _renderReplacePopup(): TemplateResult {
-        const sensorTypes = [
-            { key: 'temperature', label: TranslationUtils.translateSensor(this._hass, 'temperature'), icon: 'mdi:thermometer' },
-            { key: 'moisture', label: TranslationUtils.translateSensor(this._hass, 'soil_moisture'), icon: 'mdi:water-percent' },
-            { key: 'illuminance', label: TranslationUtils.translateSensor(this._hass, 'illuminance'), icon: 'mdi:brightness-5' },
-            { key: 'humidity', label: TranslationUtils.translateSensor(this._hass, 'air_humidity'), icon: 'mdi:water' },
-            { key: 'conductivity', label: TranslationUtils.translateSensor(this._hass, 'conductivity'), icon: 'mdi:flash' },
-            // Stromverbrauch verkabelt die TOTAL-kWh-Entity (nicht die berechnete Watt-Live).
-            // Label entsprechend "Gesamt Stromverbrauch" um die Differenzierung sichtbar zu machen.
-            { key: 'power_consumption', label: TranslationUtils.translateSensor(this._hass, 'total_power_consumption'), icon: 'mdi:power-plug' }
-        ];
-
-        // Aktuell konfigurierte external_sensor je Typ — aus plantInfo (sprachneutral).
-        const plantInfoResult = (this.plantinfo as { result?: Record<string, { sensor?: string } | undefined> & { diagnostic_sensors?: Record<string, { entity_id?: string }> } })?.result;
-        const plantData = (plantInfoResult ?? {}) as Record<string, { sensor?: string }>;
-        const diagSensors = plantInfoResult?.diagnostic_sensors ?? {};
-        const currentSourcePerType: Record<string, string | undefined> = {};
-        for (const t of sensorTypes) {
-            // power_consumption: external_sensor sitzt auf der TOTAL-Entity (kWh-Akkumulator),
-            // nicht auf der CURRENT-Watt-Entity (die ist rein berechnet aus TOTAL).
-            const lookupEntityId = t.key === 'power_consumption'
-                ? diagSensors.total_power_consumption?.entity_id
-                : plantData[t.key]?.sensor;
-            currentSourcePerType[t.key] = lookupEntityId
-                ? this._hass.states[lookupEntityId]?.attributes?.external_sensor as string | undefined
-                : undefined;
-        }
-
-        // Welche Entities als Quelle taugen, entscheidet fuer beide Dialoge
-        // dieselbe Funktion -- die Filterliste stand vorher zweimal im Code.
-        const getSensorsByType = (type: string) => getSourceSensors(this._hass, type);
-
-        return html`
-            <div class="popup-dialog" @click="${this._closePopup}">
-                <div class="popup-content" @click="${(e: Event) => e.stopPropagation()}">
-                    <div class="popup-title">${TranslationUtils.translateUI(this._hass, 'replace_sensors')}</div>
-                    ${sensorTypes.map(type => {
-                        const availableSensors = getSensorsByType(type.key);
-                        const current = currentSourcePerType[type.key];
-                        // Aktuelle Auswahl ins _popupData kippen, damit beim Submit auch ohne
-                        // Klick im Dropdown der jetzt-Wert übernommen wird (statt leerem String).
-                        if (current && !this._popupData[`new_${type.key}_sensor`]) {
-                            this._popupData[`new_${type.key}_sensor`] = current;
-                        }
-
-                        return html`
-                            <div class="form-field">
-                                <label>
-                                    <ha-icon icon="${type.icon}"></ha-icon>
-                                    ${type.label}
-                                </label>
-                                <select @change="${(e: Event) => this._popupData[`new_${type.key}_sensor`] = (e.target as HTMLSelectElement).value}">
-                                    <option value="">${TranslationUtils.translateUI(this._hass, 'please_select')}</option>
-                                    ${availableSensors.length > 0 ?
-                                        availableSensors.map(sensor => html`
-                                            <option value="${sensor.entity_id}" ?selected="${sensor.entity_id === current}">${sensor.name}</option>
-                                        `) :
-                                        html`<option value="" disabled>${TranslationUtils.translateUI(this._hass, 'no_matching_sensors')}</option>`
-                                    }
-                                </select>
-                            </div>
-                        `;
-                    })}
-                    <div class="popup-buttons">
-                        <button @click="${this._closePopup}">${TranslationUtils.translateUI(this._hass, 'cancel')}</button>
-                        <button @click="${this._handleReplaceSensors}">${TranslationUtils.translateUI(this._hass, 'replace_sensors')}</button>
                     </div>
                 </div>
             </div>

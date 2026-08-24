@@ -711,4 +711,59 @@ export const flowerListStyle = css`
   .add-plant-text:hover {
     color: var(--primary-text-color);
   }
-`; 
+
+  /* Sammelaktionen bei aktiver Mehrfachauswahl */
+  .bulk-actions {
+    position: relative;
+    display: flex;
+    justify-content: flex-end;
+    padding: 0 16px;
+  }
+
+  .bulk-trigger {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--primary-text-color);
+    opacity: 0.7;
+  }
+
+  .bulk-trigger:hover {
+    opacity: 1;
+  }
+
+  .bulk-menu {
+    position: absolute;
+    right: 16px;
+    top: 100%;
+    background: var(--card-background-color, #fff);
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    min-width: 200px;
+    padding: 4px 0;
+    z-index: 20;
+  }
+
+  .bulk-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .bulk-item:hover {
+    background: var(--secondary-background-color, #f0f0f0);
+  }
+
+  .bulk-item.danger {
+    color: var(--error-color, #db4437);
+  }
+
+  .actions-column,
+  .actions-cell {
+    width: 40px;
+    text-align: center;
+  }
+`;

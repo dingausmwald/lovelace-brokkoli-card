@@ -86,7 +86,8 @@ export class BrokkoliListComponents {
         multiSelectMode: boolean,
         sortColumn: string,
         sortDirection: 'asc' | 'desc',
-        onSort: (columnId: string) => void
+        onSort: (columnId: string) => void,
+        showActions = false
     ): HTMLTemplateResult {
         return html`
             <thead>
@@ -101,6 +102,7 @@ export class BrokkoliListComponents {
                                 html`<ha-icon icon="mdi:${sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'}"></ha-icon>` : ''}
                         </th>
                     `)}
+                    ${showActions ? html`<th class="actions-column"></th>` : ''}
                 </tr>
             </thead>
         `;
@@ -115,7 +117,8 @@ export class BrokkoliListComponents {
         onCellClick: (event: Event, plant: HomeAssistantEntity, columnId: string) => void,
         onRowClick: (event: Event, plant: HomeAssistantEntity) => void,
         getCursorStyle: (columnId: string) => string,
-        getCellValue: (plant: HomeAssistantEntity, columnId: string) => string | HTMLTemplateResult
+        getCellValue: (plant: HomeAssistantEntity, columnId: string) => string | HTMLTemplateResult,
+        actions?: HTMLTemplateResult
     ): HTMLTemplateResult {
         return html`
             <tr>
@@ -143,6 +146,7 @@ export class BrokkoliListComponents {
                         ${getCellValue(plant, column.id)}
                     </td>
                 `)}
+                ${actions ? html`<td class="actions-cell">${actions}</td>` : ''}
             </tr>
         `;
     }

@@ -14,6 +14,8 @@ import { CellRenderer } from './utils/cell-renderer';
 import { StateManager } from './utils/state-manager';
 import { TranslationUtils } from './utils/translation-utils';
 import './components/plant-create-dialog';
+import './components/plant-actions-menu';
+import './components/plant-delete-dialog';
 import './components/gallery';
 import './list-editor';
 import { LovelaceCardEditor } from 'custom-card-helpers';
@@ -50,6 +52,8 @@ export default class BrokkoliListCard extends LitElement {
     @property() _hass?: HomeAssistant;
     @property() config?: BrokkoliListCardConfig;
     private plantDialog?: HTMLElement;
+    @state() private _showBulkMenu = false;
+    @state() private _showBulkDelete = false;
     @state() private _lastSelectedEntityId: string | null = null;
 
     private plantEntities: HomeAssistantEntity[] = [];
@@ -361,6 +365,38 @@ export default class BrokkoliListCard extends LitElement {
             <div class="card-container">
                 <ha-card>
                     ${BrokkoliListComponents.renderHeader(this.config?.title, this._hass)}
+
+                    ${state.multiSelectMode && state.selectedPlants.size > 0 ? html`
+                        <div class="bulk-actions">
+                            <button class="bulk-trigger" @click=${(e: Event) => {
+                                e.stopPropagation();
+                                this._showBulkMenu = !this._showBulkMenu;
+                            }}>
+                                <ha-icon icon="mdi:dots-vertical"></ha-icon>
+                            </button>
+                            ${this._showBulkMenu ? html`
+                                <div class="bulk-menu">
+                                    <div class="bulk-item danger" @click=${(e: Event) => {
+                                        e.stopPropagation();
+                                        this._showBulkMenu = false;
+                                        this._showBulkDelete = true;
+                                    }}>
+                                        <ha-icon icon="mdi:delete"></ha-icon>
+                                        <span>${TranslationUtils.translateUI(this._hass!, 'delete_selected')} (${state.selectedPlants.size})</span>
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    ` : ''}
+
+                    ${this._showBulkDelete ? html`
+                        <plant-delete-dialog
+                            .hass=${this._hass}
+                            .plants=${this.plantEntities.filter(p => state.selectedPlants.has(p.entity_id))}
+                            @dialog-closed=${() => { this._showBulkDelete = false; }}
+                            @plant-deleted=${() => { this.stateManager?.toggleMultiSelect(); this.updatePlantEntities(); }}
+                        ></plant-delete-dialog>
+                    ` : ''}
                     
                     ${BrokkoliListComponents.renderToolbar(
                         this.config,
@@ -392,7 +428,8 @@ export default class BrokkoliListCard extends LitElement {
                                 state.multiSelectMode,
                                 state.sortColumn,
                                 state.sortDirection,
-                                (columnId) => this.stateManager!.handleSort(columnId)
+                                (columnId) => this.stateManager!.handleSort(columnId),
+                                true
                             )}
                             <tbody>
                                 ${isAddPlantEnabled && addPlantPosition === 'top' ? 
@@ -415,7 +452,14 @@ export default class BrokkoliListCard extends LitElement {
                                             onCellClick: (e) => this.stateManager!.handleCellClick(e, p, columnId, this.dispatchEvent.bind(this)),
                                             onInputUpdate: (e, type) => this.stateManager!.handleInputUpdate(e, p, columnId, type),
                                             onRowClick: (e) => this._handleRowClick(e, p)
-                                        })
+                                        }),
+                                        // Klonen, Sensoren ersetzen, Loeschen -- dieselben
+                                        // Dialoge wie in Brokkoli- und Area-Card.
+                                        html`<plant-actions-menu
+                                            .hass=${this._hass}
+                                            .plant=${plant}
+                                            @plant-deleted=${() => this.updatePlantEntities()}
+                                        ></plant-actions-menu>`
                                     )
                                 )}
                                 ${isAddPlantEnabled && addPlantPosition === 'bottom' ? 

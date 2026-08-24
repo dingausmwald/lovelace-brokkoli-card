@@ -303,7 +303,8 @@
       "main_images": "Главные изображения",
       "edit": "Редактировать",
       "save": "Сохранить",
-      "legend_collapsed_mode_active": "Режим: Свёрнуто (щёлкните для переключения)"
+      "legend_collapsed_mode_active": "Режим: Свёрнуто (щёлкните для переключения)",
+      "delete_selected": "Удалить выбранные"
     },
     "sensors": {
       "temperature": "Температура",

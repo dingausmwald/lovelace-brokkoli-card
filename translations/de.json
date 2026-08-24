@@ -85,7 +85,8 @@
       "no_sensor": "Keiner",
       "edit": "Bearbeiten",
       "save": "Speichern",
-      "legend_collapsed_mode_active": "Modus: Eingeklappt (Klick wechselt)"
+      "legend_collapsed_mode_active": "Modus: Eingeklappt (Klick wechselt)",
+      "delete_selected": "Ausgewählte löschen"
     },
     "fields": {
       "friendly_name": "Name",

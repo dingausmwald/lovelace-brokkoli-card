@@ -85,7 +85,8 @@
       "confirm": "Confirm",
       "edit": "Edit",
       "save": "Save",
-      "legend_collapsed_mode_active": "Mode: Collapsed (click to switch)"
+      "legend_collapsed_mode_active": "Mode: Collapsed (click to switch)",
+      "delete_selected": "Delete selected"
     },
     "fields": {
       "friendly_name": "Name",
