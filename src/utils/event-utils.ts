@@ -90,7 +90,7 @@ export class EventUtils {
         }
 
         // Use entity ID from sensor map exclusively
-        const entityId = getSensorMapEntityId(plant, columnId);
+        const entityId = getSensorMapEntityId(hass, plant, columnId);
         if (service.entityPrefix && entityId) {
             const serviceParams: Record<string, unknown> = {
                 entity_id: entityId
@@ -103,9 +103,15 @@ export class EventUtils {
             }
 
             await hass.callService(service.domain, service.action, serviceParams);
+        } else if (service.entityPrefix) {
+            // Der Dienst gehoert zu einer Helfer-Entity (select./number.). Ist die
+            // nicht auffindbar, hat der Aufruf kein Ziel -- ihn stattdessen an die
+            // plant-Entity zu schicken, aendert nichts und fuellt nur das Protokoll
+            // mit "Referenced entities plant.x are missing or not currently available".
+            console.warn(`[BROKKOLI] Keine Helfer-Entity fuer ${columnId} an ${plant.entity_id}`);
+            return;
         } else {
-            // If no sensor map entry is available, use the plant entity for attributes
-            // directly on the plant
+            // Attribute liegen direkt auf der Pflanze.
             const serviceParams: Record<string, unknown> = {
                 entity_id: plant.entity_id
             };
@@ -161,7 +167,8 @@ export class EventUtils {
         event: Event,
         plant: HomeAssistantEntity,
         columnId: string,
-        showMoreInfo: (entityId: string) => void
+        showMoreInfo: (entityId: string) => void,
+        hass?: HomeAssistant
     ): void {
         event.stopPropagation();
         const field = getFieldDefinition(columnId);
@@ -172,7 +179,7 @@ export class EventUtils {
         }
 
         // Only use entity ID from sensor map, no fallbacks
-        const entityId = getSensorMapEntityId(plant, columnId);
+        const entityId = getSensorMapEntityId(hass, plant, columnId);
         if (entityId) {
             showMoreInfo(entityId);
             return;

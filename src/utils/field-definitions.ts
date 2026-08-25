@@ -1,6 +1,7 @@
 import { HomeAssistant } from 'custom-card-helpers';
 import { HomeAssistantEntity } from '../types/brokkoli-list-card-types';
 import { TranslationUtils } from './translation-utils';
+import { PlantEntityUtils } from './plant-entity-utils';
 import { PHASES } from './constants';
 
 export type FieldType = 'text' | 'number' | 'date' | 'select' | 'textarea' | 'sensor' | 'badge' | 'website' | 'plant-name';
@@ -60,15 +61,26 @@ const NUMBER_SERVICE: FieldService = {
 const SENSOR_FIELDS = ['air_humidity', 'soil_moisture', 'temperature', 'conductivity', 'illuminance', 'dli', 'water_consumption', 'fertilizer_consumption', 'ph'] as const;
 
 // Helper functions
-export const getSensorMapEntityId = (plant: HomeAssistantEntity, attribute: string): string | null => {
+export const getSensorMapEntityId = (
+    hass: HomeAssistant | undefined,
+    plant: HomeAssistantEntity,
+    attribute: string
+): string | null => {
     if (plant.attributes._sensorMap && plant.attributes._sensorMap[attribute]) {
         return plant.attributes._sensorMap[attribute];
+    }
+    // Die Map der Karte kann noch leer sein -- direkt nach dem Klonen etwa,
+    // bevor plant/get_info durch ist. In der Entity-Registry steht die
+    // Zuordnung immer, also dort nachschlagen statt aufzugeben.
+    if (hass) {
+        const ausRegistry = PlantEntityUtils.buildSensorMap(hass, plant.entity_id)[attribute];
+        if (ausRegistry) return ausRegistry;
     }
     return null;
 };
 
 export const getSensorMapEntity = (hass: HomeAssistant, plant: HomeAssistantEntity, attribute: string) => {
-    const entityId = getSensorMapEntityId(plant, attribute);
+    const entityId = getSensorMapEntityId(hass, plant, attribute);
     return entityId ? hass?.states[entityId] : null;
 };
 

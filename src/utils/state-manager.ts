@@ -129,7 +129,7 @@ export class StateManager {
                 
                 // Only use entity ID from sensor map, no fallbacks
                 if (isSensorField(columnId)) {
-                    const sensorEntityId = getSensorMapEntityId(plant, columnId);
+                    const sensorEntityId = getSensorMapEntityId(this.hass, plant, columnId);
                     if (sensorEntityId) {
                         entityId = sensorEntityId;
                     }

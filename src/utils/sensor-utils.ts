@@ -104,8 +104,8 @@ export class SensorUtils {
         // Grenzwerte sind eigene number-Entities. Sind sie auffindbar, zaehlen
         // sie -- der API-Schnappschuss traegt nur ihre Zahlen und ist so alt wie
         // der letzte Abruf.
-        const minEntityId = getSensorMapEntityId(plant, `min_${columnId}`);
-        const maxEntityId = getSensorMapEntityId(plant, `max_${columnId}`);
+        const minEntityId = getSensorMapEntityId(hass, plant, `min_${columnId}`);
+        const maxEntityId = getSensorMapEntityId(hass, plant, `max_${columnId}`);
 
         if (minEntityId && maxEntityId &&
             hass.states[minEntityId]?.state !== undefined &&
