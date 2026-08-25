@@ -2793,7 +2793,7 @@ export class BrokkoliArea extends LitElement {
       }
       this._updateTimeout = window.setTimeout(() => {
         this._loadAllPlantData();
-      }, 10000); // Alle 10 Sekunden aktualisieren
+      }, 60000); // Einmal pro Minute; Messwerte kommen live aus hass.states
       
       return;
     }
@@ -2833,6 +2833,6 @@ export class BrokkoliArea extends LitElement {
     }
     this._updateTimeout = window.setTimeout(() => {
       this._loadAllPlantData();
-    }, 10000); // Alle 10 Sekunden aktualisieren
+    }, 60000); // Einmal pro Minute; Messwerte kommen live aus hass.states
   }
 }

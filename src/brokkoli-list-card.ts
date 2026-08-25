@@ -58,6 +58,7 @@ export default class BrokkoliListCard extends LitElement {
 
     private plantEntities: HomeAssistantEntity[] = [];
     private plantIds = '';
+    private lastRefresh = 0;
     private readonly EDITABLE_PLANT_ATTRIBUTES = ConfigUtils.EDITABLE_PLANT_ATTRIBUTES;
     private stateManager?: StateManager;
 
@@ -105,8 +106,11 @@ export default class BrokkoliListCard extends LitElement {
         if (ids !== this.plantIds) {
             this.plantIds = ids;
             this.updatePlantEntities();
-        } else {
-            // Bei nachfolgenden Updates nur die vorhandenen Entitäten aktualisieren
+        } else if (Date.now() - this.lastRefresh > 2000) {
+            // Bei nachfolgenden Updates nur die vorhandenen Entitäten aktualisieren.
+            // Gedrosselt: hass feuert bei jeder Zustandsaenderung im ganzen System,
+            // und der Durchlauf baut jede Pflanze neu auf.
+            this.lastRefresh = Date.now();
             this._refreshExistingEntities();
         }
     }

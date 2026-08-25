@@ -118,12 +118,17 @@ export class PlantEntityUtils {
             delete this._plantRetryTimeouts[plantEntityId];
         }
         
-        // Set timeout for next update
+        // Alle fuenf Sekunden pro Pflanze war bei 50 Pflanzen ein Dauerfeuer von
+        // rund zehn Websocket-Aufrufen je Sekunde -- HA trennt die Verbindung mit
+        // "Client unable to keep up with pending messages", und dann schlaegt
+        // schlagartig JEDER Aufruf der Karte fehl. Messwerte kommen ohnehin aus
+        // hass.states; aus get_info stammen nur Struktur und Grenzwerte, die sich
+        // selten aendern.
         this._plantRetryTimeouts[plantEntityId] = window.setTimeout(() => {
             delete this._plantRetryTimeouts[plantEntityId];
             // Execute another API call
             this._loadPlantInfoWithRetry(hass, plantEntityId);
-        }, isError ? 10000 : 5000); // 10 seconds on error, otherwise 5 seconds
+        }, isError ? 60000 : 60000); // eine Minute, im Fehlerfall ebenso
     }
     
     // Starts the initial loading of all plant data with a slight delay
