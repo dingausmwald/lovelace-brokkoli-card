@@ -523,29 +523,22 @@ export const positionStyles: CSSResult = css`
     transition: opacity 0.2s ease, box-shadow 0.2s ease, font-weight 0.2s ease;
   }
   
+  /* Growing is the alarm signal. Fading while it grows is not: the badge is
+     asking to be read at exactly the moment it turns see-through. A pulsating
+     badge therefore sits at full opacity and only scales. */
   .sensor-label.sensor-pulsating {
     animation: label-pulse 1s infinite alternate ease-in-out;
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
-    will-change: transform, opacity;
+    opacity: 1;
+    will-change: transform;
   }
   
-  .sensor-label.sensor-pulsating ha-icon,
-  .sensor-label.sensor-pulsating .sensor-value {
-    animation: sensor-color-pulse 1s infinite alternate ease-in-out;
-    will-change: opacity;
-  }
-  
-  /* transform and opacity are the only two properties the compositor can
-     animate without repainting. The box-shadow that used to grow along with
-     the scale is now a static, already-strong shadow. */
+  /* transform is the one property the compositor can animate without
+     repainting anything. The box-shadow that used to grow along with the
+     scale is now a static, already-strong shadow. */
   @keyframes label-pulse {
-    from { transform: scale(1); opacity: 0.9; }
-    to { transform: scale(1.15); opacity: 1; }
-  }
-  
-  @keyframes sensor-color-pulse {
-    from { opacity: 1; }
-    to { opacity: 0.45; }
+    from { transform: scale(1); }
+    to { transform: scale(1.15); }
   }
   
   .sensor-label ha-icon {
@@ -570,9 +563,6 @@ export const positionStyles: CSSResult = css`
     top: 10px;
     z-index: 10;
     width: 40px;
-    /* 40 not 36: matches the collapsed legend's shell exactly, so the two
-       buttons sit side by side as one pair. */
-    height: 40px;
     background-color: var(--card-background-color, #fff);
     border-radius: 10px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
@@ -621,9 +611,7 @@ export const positionStyles: CSSResult = css`
     .grid-cell.add-indicator,
     .sensor-pulsating,
     .pulsating,
-    .sensor-label.sensor-pulsating,
-    .sensor-label.sensor-pulsating ha-icon,
-    .sensor-label.sensor-pulsating .sensor-value {
+    .sensor-label.sensor-pulsating {
       animation: none;
     }
   }

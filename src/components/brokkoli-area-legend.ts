@@ -509,7 +509,7 @@ export class BrokkoliAreaLegend extends LitElement {
   
   render() {
     return html`
-      <div class="legend-container" @click=${this._stopEvent}>
+      <div class="legend-container ${this._activeTab === 'collapsed' ? 'collapsed' : ''}" @click=${this._stopEvent}>
         ${this._renderModeToggle()}
         
         <div class="content-container" @click=${this._stopEvent}>

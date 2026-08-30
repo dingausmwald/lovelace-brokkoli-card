@@ -51,6 +51,13 @@ export const legendStyles: CSSResult = css`
     transform: scale(1.05);
   }
   
+  /* Collapsed, the content area holds nothing but still contributed its 2px
+     of padding top and bottom -- 4px below the button, 4px of margin above it,
+     so the knob sat visibly off-centre in its box next to the edit toggle. */
+  .legend-container.collapsed .content-container {
+    display: none;
+  }
+  
   .content-container {
     flex: 1;
     overflow-y: auto;
