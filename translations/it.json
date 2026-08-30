@@ -304,7 +304,9 @@
       "edit": "Modifica",
       "save": "Salva",
       "legend_collapsed_mode_active": "Modalità: Compresso (clic per cambiare)",
-      "delete_selected": "Elimina selezionate"
+      "delete_selected": "Elimina selezionate",
+      "area_edit_mode_on": "Modalità spostamento attiva - clicca per uscire dalla modifica",
+      "area_edit_mode_off": "Modalità vista - clicca per attivare spostamento e selezione multipla"
     },
     "sensors": {
       "temperature": "Temperatura",

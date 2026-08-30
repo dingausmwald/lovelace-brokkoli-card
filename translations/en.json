@@ -86,7 +86,9 @@
       "edit": "Edit",
       "save": "Save",
       "legend_collapsed_mode_active": "Mode: Collapsed (click to switch)",
-      "delete_selected": "Delete selected"
+      "delete_selected": "Delete selected",
+      "area_edit_mode_on": "Move mode on - click to leave edit mode",
+      "area_edit_mode_off": "View mode - click to enable moving and multi-select"
     },
     "fields": {
       "friendly_name": "Name",

@@ -1,10 +1,12 @@
 import {
   LitElement,
   html,
+  svg,
   css,
   nothing,
   CSSResult,
-  TemplateResult
+  TemplateResult,
+  SVGTemplateResult
 } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { HomeAssistant } from 'custom-card-helpers';
@@ -16,6 +18,7 @@ import './brokkoli-area-legend'; // Importiere die neue Legende-Komponente
 import { LegendSettings } from './brokkoli-area-legend'; // Importiere die Settings-Schnittstelle
 
 import { PlantEntityUtils } from '../utils/plant-entity-utils';
+import { TranslationUtils } from '../utils/translation-utils';
 
 interface SensorData {
   icon?: string;
@@ -54,12 +57,99 @@ interface CycleGroup {
   positions: Position[];
 }
 
+// Properties that can move a plant on screen. Only these are worth a rebuild
+// of the cycle frames, which measures every member element in the DOM.
+const GEOMETRY_KEYS = [
+  'entities',
+  '_bounds',
+  '_cellSize',
+  '_containerSize',
+  '_cycleGroups',
+  '_currentDragPosition',
+  '_draggingMember',
+  '_isSnapping',
+  '_editMode',
+];
+
 
 
 @customElement('brokkoli-area')
 export class BrokkoliArea extends LitElement {
-  @property({ attribute: false }) hass?: HomeAssistant;
-  @property({ attribute: false }) entities: string[] = [];
+  // hass is deliberately NOT a reactive property. Home Assistant hands out a
+  // new hass object on every state change anywhere in the instance, so a light
+  // switching on in another room used to re-render every plant, every sensor
+  // ring and every label on this card. The setter below compares only the
+  // entities this card actually draws -- by state-object identity, which HA
+  // replaces per entity -- and asks Lit for a frame only when one of them moved.
+  private _hass?: HomeAssistant;
+
+  // Bumped by the setter; this is the reactive part hass now feeds.
+  @state() private _hassGeneration = 0;
+
+  // Entities whose values end up on screen (plants, their sensors) and the
+  // location helpers that decide where a plant sits. Kept apart because only
+  // the second group has to trigger the expensive _loadPositions().
+  private _watchedValueEntities: string[] = [];
+  private _watchedPositionEntities: string[] = [];
+  private _watchedDirty = true;
+  private _positionsDirty = true;
+
+  // Set by willUpdate when _loadPositions actually moved something. _positions
+  // is mutated in place, so changedProps never mentions it.
+  private _geometryChanged = false;
+
+  set hass(hass: HomeAssistant | undefined) {
+    const previous = this._hass;
+    this._hass = hass;
+    if (!hass) return;
+
+    if (!previous) {
+      this._watchedDirty = true;
+      this._positionsDirty = true;
+      this._hassGeneration++;
+      return;
+    }
+
+    // The registry moved: which plants belong here, and which helper belongs
+    // to which plant, can both have changed. Rebuild and redraw.
+    if (previous.entities !== hass.entities || previous.devices !== hass.devices) {
+      this._watchedDirty = true;
+      this._positionsDirty = true;
+      this._hassGeneration++;
+      return;
+    }
+
+    if (previous.states === hass.states && previous.language === hass.language) return;
+
+    if (this._watchedDirty) this._rebuildWatchedEntities();
+
+    const positionsChanged = this._watchedPositionEntities.some(
+      id => previous.states[id] !== hass.states[id]
+    );
+    const valuesChanged = positionsChanged || previous.language !== hass.language ||
+      this._watchedValueEntities.some(id => previous.states[id] !== hass.states[id]);
+
+    if (positionsChanged) this._positionsDirty = true;
+    if (valuesChanged) this._hassGeneration++;
+  }
+
+  get hass(): HomeAssistant | undefined {
+    return this._hass;
+  }
+
+  // The card above builds this array fresh on every render, so its identity
+  // always differs. Only a different set of plants is worth a re-render --
+  // otherwise every state change in the house would look like new entities.
+  @property({
+    attribute: false,
+    hasChanged: (value: unknown, old: unknown) => {
+      const next = (value ?? []) as string[];
+      const previous = (old ?? []) as string[];
+      return next.length !== previous.length
+        || next.some((entityId, index) => entityId !== previous[index]);
+    },
+  })
+  entities: string[] = [];
   @property() areaId?: string;
   @property({ attribute: false }) showRings: string[] = [];
   @property({ attribute: false }) showLabels: string[] = [];
@@ -82,7 +172,6 @@ export class BrokkoliArea extends LitElement {
   
   @state() private _positions: Record<string, Position> = {};
   @state() private _draggingMember: string | null = null;
-  @state() private _hoveringMember: string | null = null;
   @state() private _dragOffset = { x: 0, y: 0 };
   @state() private _containerSize = { width: 0, height: 0 };
   @state() private _cellSize = 60; // Standardgröße für Zellen
@@ -92,6 +181,12 @@ export class BrokkoliArea extends LitElement {
   @state() private _originalPosition: Position | null = null;
   @state() private _wasElementSelected = false; // Speichert, ob das gezogene Element beim Start bereits ausgewählt war
   
+  // Dragging, multi-select and the identifier hook only exist while edit mode
+  // is on. Without it a click is what a click is everywhere else in Home
+  // Assistant: it opens the entity's more-info dialog. The mode always starts
+  // off, so a plant cannot be dragged out of place by an accidental click.
+  @state() private _editMode = false;
+
   @state() private _selectedMembers: Set<string> = new Set();
   @state() private _isMultiDragging = false;
   @state() private _originalPositions: Record<string, Position> = {};
@@ -126,6 +221,16 @@ export class BrokkoliArea extends LitElement {
   // (z.B. Tab-Switch). window-resize verfehlt letzteren Fall.
   private _resizeObserver?: ResizeObserver;
 
+  // Pauses the endless alarm animations while the card is off screen.
+  private _visibilityObserver?: IntersectionObserver;
+
+  // Single pending rebuild of the cycle frames, see _scheduleCycleGroupUpdate.
+  private _cycleGroupTimer = 0;
+
+  // One drag update per frame instead of one per mousemove event.
+  private _dragFrame = 0;
+  private _pendingDragPoint?: { x: number, y: number };
+
   // Bound event handlers to ensure proper reference
   private _boundHandleDrag = this._handleDrag.bind(this);
   private _boundEndDrag = this._endDrag.bind(this);
@@ -156,6 +261,15 @@ export class BrokkoliArea extends LitElement {
     this.addEventListener('plant-created', this._handlePlantCreated);
 
     this._userSettings = this._ladeEinstellungen();
+
+    // Alarm badges and rings animate forever. A card that has been scrolled
+    // out of view still costs the compositor a frame per tick, so pause the
+    // animations while nothing of the card is on screen.
+    this._visibilityObserver = new IntersectionObserver(entries => {
+      const visible = entries.some(entry => entry.isIntersecting);
+      this.toggleAttribute('data-offscreen', !visible);
+    });
+    this._visibilityObserver.observe(this);
   }
 
   // Die Legenden-Einstellungen (Ringe, Labels, Heatmap) sind eine Ansichtssache
@@ -177,20 +291,48 @@ export class BrokkoliArea extends LitElement {
   }
   
   // Wird aufgerufen, wenn sich Eigenschaften ändern
+  // Positions have to be read BEFORE the render that draws them. _positions is
+  // only ever mutated in place, never reassigned, so Lit cannot see it change;
+  // reading it in updated() meant a moved plant was drawn one render late --
+  // harmless while every state change forced a render, wrong now that they
+  // no longer do.
+  willUpdate(changedProps: Map<string, unknown>) {
+    super.willUpdate(changedProps);
+    
+    if (changedProps.has('entities')) {
+      this._watchedDirty = true;
+      this._positionsDirty = true;
+    }
+    
+    // Positions are only re-read when a location helper actually changed --
+    // the hass setter decides that, not the fact that a render happened.
+    if (this._positionsDirty && this.hass) {
+      this._positionsDirty = false;
+      const before = this._positionSignature();
+      this._loadPositions();
+      if (before !== this._positionSignature()) this._geometryChanged = true;
+    }
+  }
+  
+  private _positionSignature(): string {
+    return Object.entries(this._positions)
+      .map(([entityId, pos]) => `${entityId}:${pos.x},${pos.y}`)
+      .join('|');
+  }
+  
   updated(changedProps: Map<string, unknown>) {
     super.updated(changedProps);
     
-    // Wenn sich hass oder entities geändert haben, lade die Positionen neu
-    if (changedProps.has('hass') || changedProps.has('entities')) {
-      this._loadPositions();
+    // Positioniere die Cycle-Gruppen-Rahmen nach dem Rendering. Der Rebuild
+    // misst jedes Member-Element im DOM und erzwingt damit ein Layout, also
+    // nur dann, wenn sich wirklich etwas bewegt haben kann.
+    if (this._geometryChanged || GEOMETRY_KEYS.some(key => changedProps.has(key))) {
+      this._geometryChanged = false;
+      this._scheduleCycleGroupUpdate();
     }
     
-    // Positioniere die Cycle-Gruppen-Rahmen nach dem Rendering
-    this._updateCycleGroups();
-    
-    // Wenn sich die Entitäten geändert haben oder hass zum ersten Mal gesetzt wird
-    if (changedProps.has('entities') || 
-        (changedProps.has('hass') && !changedProps.get('hass'))) {
+    // Wenn sich die Entitäten geändert haben
+    if (changedProps.has('entities')) {
       // Starte die Ladung aller Pflanzendaten mit der neuen optimierten Methode
       this._loadAllPlantData();
     }
@@ -234,6 +376,8 @@ export class BrokkoliArea extends LitElement {
     window.removeEventListener('click', this._handleGlobalClick);
     this._resizeObserver?.disconnect();
     this._resizeObserver = undefined;
+    this._visibilityObserver?.disconnect();
+    this._visibilityObserver = undefined;
     
     // Event-Listener für neu erstellte Pflanzen entfernen
     this.removeEventListener('plant-created', this._handlePlantCreated);
@@ -242,6 +386,14 @@ export class BrokkoliArea extends LitElement {
     if (this._updateTimeout) {
       clearTimeout(this._updateTimeout);
       this._updateTimeout = 0;
+    }
+    if (this._cycleGroupTimer) {
+      clearTimeout(this._cycleGroupTimer);
+      this._cycleGroupTimer = 0;
+    }
+    if (this._dragFrame) {
+      cancelAnimationFrame(this._dragFrame);
+      this._dragFrame = 0;
     }
   }
   
@@ -256,20 +408,70 @@ export class BrokkoliArea extends LitElement {
   // findet ihn dort nie, die Karte hält jede Pflanze für positionslos und
   // verteilt sie neu — eine verschobene Pflanze springt dann zurück.
   private _findLocationEntity(plantEntityId: string) {
-    if (!this.hass) return null;
-    const plantEntity = this.hass.entities?.[plantEntityId];
-    const deviceId = plantEntity?.device_id;
-    if (!deviceId) return null;
-    for (const e of Object.values(this.hass.entities ?? {})) {
-      if (
-        e.device_id === deviceId
-        && e.entity_id.startsWith('text.')
-        && (e as { translation_key?: string }).translation_key === 'location'
-      ) {
-        return this.hass.states[e.entity_id] ?? null;
+    const helperId = this._locationHelperFor(plantEntityId);
+    return helperId ? this.hass?.states[helperId] ?? null : null;
+  }
+
+  // The lookup above walked the whole entity registry once per plant, on every
+  // hass update. The registry only changes when someone adds or renames an
+  // entity, so one device_id -> helper index per registry version is enough.
+  private _locationHelperIndex = new Map<string, string>();
+  private _locationHelperIndexSource?: unknown;
+
+  private _locationHelperFor(plantEntityId: string): string | undefined {
+    const hass = this.hass;
+    if (!hass?.entities) return undefined;
+
+    if (this._locationHelperIndexSource !== hass.entities) {
+      const index = new Map<string, string>();
+      for (const e of Object.values(hass.entities)) {
+        if (
+          e.device_id
+          && e.entity_id.startsWith('text.')
+          && (e as { translation_key?: string }).translation_key === 'location'
+        ) {
+          index.set(e.device_id, e.entity_id);
+        }
+      }
+      this._locationHelperIndex = index;
+      this._locationHelperIndexSource = hass.entities;
+    }
+
+    const deviceId = hass.entities[plantEntityId]?.device_id;
+    return deviceId ? this._locationHelperIndex.get(deviceId) : undefined;
+  }
+
+  // Collects everything the card reads out of hass.states: the plants
+  // themselves, the sensors behind their rings and badges, and -- kept
+  // separate -- the location helpers that decide where a plant sits.
+  private _rebuildWatchedEntities() {
+    this._watchedDirty = false;
+
+    const values = new Set<string>(this.entities);
+    const positions = new Set<string>();
+
+    for (const entityId of this.entities) {
+      const helperId = this._locationHelperFor(entityId);
+      if (helperId) positions.add(helperId);
+
+      const result = this._plantInfoCache[entityId]?.result;
+      if (!result) continue;
+
+      for (const [key, value] of Object.entries(result)) {
+        if (key === 'helpers') continue;
+        const sensor = (value as SensorData)?.sensor;
+        if (typeof sensor === 'string') values.add(sensor);
+      }
+
+      for (const helper of Object.values(result.helpers ?? {})) {
+        if (helper && typeof helper === 'object' && helper.entity_id) {
+          values.add(helper.entity_id);
+        }
       }
     }
-    return null;
+
+    this._watchedValueEntities = [...values];
+    this._watchedPositionEntities = [...positions];
   }
 
   // Lädt die Positionen aus den Entitäten
@@ -505,6 +707,37 @@ export class BrokkoliArea extends LitElement {
     };
   }
   
+  private _toggleEditMode = (e: MouseEvent) => {
+    e.stopPropagation();
+    this._editMode = !this._editMode;
+
+    if (!this._editMode) {
+      // Leaving edit mode drops the visible selection, but deliberately does
+      // not announce an empty one: a brokkoli-card linked through the
+      // identifier hook keeps showing the plant that was picked last.
+      this._selectedMembers = new Set();
+      this._showAddPlantIndicator = null;
+      this._showSelectionHint = false;
+    }
+  };
+
+  // Outside edit mode the card behaves like any other Home Assistant card.
+  private _openMoreInfo(entityId: string) {
+    this.dispatchEvent(new CustomEvent('hass-more-info', {
+      detail: { entityId },
+      bubbles: true,
+      composed: true,
+    }));
+  }
+
+  // A badge stands for its own sensor, not for the plant behind it.
+  private _handleSensorLabelClick(e: MouseEvent, sensorEntityId?: string) {
+    if (this._editMode || !sensorEntityId) return;
+    e.stopPropagation();
+    e.preventDefault();
+    this._openMoreInfo(sensorEntityId);
+  }
+
   // Behandelt globale Klicks, um das Plus-Symbol zurückzusetzen
   private _handleGlobalClick = (e: MouseEvent) => {
     // Prüfe nur außerhalb UND wenn keine Auswahl gezogen wird
@@ -573,14 +806,14 @@ export class BrokkoliArea extends LitElement {
                         (this._isMultiDragging && this._selectedMembers.has(entityId));
       const isSnapping = this._isSnapping && 
                         (this._draggingMember === entityId || this._selectedMembers.has(entityId));
-      const isHovering = this._hoveringMember === entityId;
       const isSelected = this._selectedMembers.has(entityId);
       
       // Z-Index anpassen - relativ und basierend auf der Anzahl der Pflanzen
       let zIndex = zIndexMap.get(entityId);
       // Kleinere Erhöhungen reichen jetzt aus, da keine CSS-Überschreibungen mehr stören
+      // Hover is handled by CSS (.member-wrapper:hover) so that moving the
+      // mouse across the room does not re-render every plant.
       if (isDragging) zIndex += 3; // Ziehen erhöht Z-Index am stärksten
-      else if (isHovering) zIndex += 2; // Hover erhöht Z-Index mittelstark
       else if (isSelected) zIndex += 1; // Selektion erhöht Z-Index leicht
       
       // Heatmap-Styling hinzufügen, wenn ein Heatmap-Sensor konfiguriert ist
@@ -673,6 +906,8 @@ export class BrokkoliArea extends LitElement {
                 if (result) {
                   // Cache das Ergebnis im lokalen Cache
                   this._plantInfoCache[entityId] = { result: result as PlantInfo['result'] };
+                  // New snapshot -> new sensor entities behind the rings.
+                  this._watchedDirty = true;
                   this.requestUpdate();
                 }
               });
@@ -699,7 +934,7 @@ export class BrokkoliArea extends LitElement {
       
       return html`
         <div 
-          class="member-wrapper ${isDragging ? 'dragging' : ''} ${isHovering ? 'hovering' : ''} ${isSelected ? 'selected' : ''}"
+          class="member-wrapper ${isDragging ? 'dragging' : ''} ${isSelected ? 'selected' : ''}"
           style=${styleMap({
             left: `${pixelPos.x}px`, top: `${pixelPos.y}px`, 
             '--cell-size': `${this._cellSize}px`, '--z-index': `${zIndex}`, 'z-index': `${zIndex}`
@@ -711,8 +946,6 @@ export class BrokkoliArea extends LitElement {
             @mousedown=${(e: MouseEvent) => this._startDrag(e, entityId)}
             @touchstart=${(e: TouchEvent) => this._handleTouchStart(e, entityId)}
             @click=${(e: MouseEvent) => this._handleClick(e, entityId)}
-            @mouseover=${() => { this._hoveringMember = entityId; }}
-            @mouseleave=${() => { this._hoveringMember = null; }}
           >
             <div class="member-image" style=${styleMap({
               backgroundImage: image ? `url(${image})` : 'none'
@@ -722,11 +955,11 @@ export class BrokkoliArea extends LitElement {
               ${!image ? html`<ha-icon icon="mdi:flower"></ha-icon>` : ''}
             </div>
           </div>
-          <div class="entity-name ${strainText ? 'shifted' : ''} ${isDragging ? 'dragging' : ''} ${isHovering ? 'hovering' : ''} ${isSelected ? 'selected' : ''}">
+          <div class="entity-name ${strainText ? 'shifted' : ''} ${isDragging ? 'dragging' : ''} ${isSelected ? 'selected' : ''}">
             ${name}
           </div>
           ${strainText ? html`
-            <div class="entity-strain ${isDragging ? 'dragging' : ''} ${isHovering ? 'hovering' : ''} ${isSelected ? 'selected' : ''}">
+            <div class="entity-strain ${isDragging ? 'dragging' : ''} ${isSelected ? 'selected' : ''}">
               ${strainText}
             </div>
           ` : ''}
@@ -981,6 +1214,13 @@ export class BrokkoliArea extends LitElement {
     e.stopPropagation();
     e.preventDefault();
     
+    // Outside edit mode there is no selection to toggle: the circle is the
+    // plant, so it opens the plant's more-info dialog.
+    if (!this._editMode) {
+      this._openMoreInfo(entityId);
+      return;
+    }
+    
     // Wenn gerade ein Multi-Drag beendet wurde, setze nur das Flag zurück
     if (this._justFinishedMultiDrag) {
       this._justFinishedMultiDrag = false;
@@ -1026,6 +1266,10 @@ export class BrokkoliArea extends LitElement {
   
   // Beginnt das Ziehen eines Elements
   private _startDrag(e: MouseEvent | TouchEvent, entityId: string) {
+    if (!this._editMode) {
+      return; // Verschieben gibt es nur im Bearbeiten-Modus
+    }
+    
     if (this._showAddPlantDialog) {
       return; // Kein Ziehen, wenn der Dialog geöffnet ist
     }
@@ -1108,14 +1352,33 @@ export class BrokkoliArea extends LitElement {
     window.addEventListener('touchend', this._boundEndDrag);
   }
   
-  // Behandelt das Ziehen eines Members oder einer Auswahl
+  // Behandelt das Ziehen eines Members oder einer Auswahl. mousemove feuert
+  // deutlich häufiger als der Bildschirm zeichnet, und jedes Update rendert
+  // die ganze Karte neu -- deshalb höchstens ein Update pro Frame.
   private _handleDrag(e: MouseEvent | TouchEvent) {
     if (!this._draggingMember && !this._isMultiDragging) return;
     
     e.preventDefault();
     
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    // Read the coordinates now: a TouchList is live, a frame later it can
+    // already describe the next position.
+    this._pendingDragPoint = {
+      x: 'touches' in e ? e.touches[0].clientX : e.clientX,
+      y: 'touches' in e ? e.touches[0].clientY : e.clientY,
+    };
+    
+    if (this._dragFrame) return;
+    this._dragFrame = requestAnimationFrame(() => {
+      this._dragFrame = 0;
+      const point = this._pendingDragPoint;
+      this._pendingDragPoint = undefined;
+      if (point) this._applyDrag(point.x, point.y);
+    });
+  }
+  
+  private _applyDrag(clientX: number, clientY: number) {
+    if (!this._draggingMember && !this._isMultiDragging) return;
+    
     const rect = this.getBoundingClientRect();
     const mouseX = clientX - rect.left;
     const mouseY = clientY - rect.top;
@@ -1190,6 +1453,14 @@ export class BrokkoliArea extends LitElement {
   
   private _endDrag(e: MouseEvent | TouchEvent) {
     if (!this._draggingMember && !this._isMultiDragging) return;
+    
+    // A drag update still queued for the next frame would fight the final
+    // position computed below.
+    if (this._dragFrame) {
+      cancelAnimationFrame(this._dragFrame);
+      this._dragFrame = 0;
+      this._pendingDragPoint = undefined;
+    }
     
     const wasMultiDragging = this._isMultiDragging;
     
@@ -1453,8 +1724,10 @@ export class BrokkoliArea extends LitElement {
       }
     });
     
-    // Quadrate für den Hintergrund rendern
-    const squares: TemplateResult[] = [];
+    // Alle Zellen liegen in EINEM svg: als je eigenes <svg> kostete jede Zelle
+    // ein eigenes Layout- und Paint-Objekt samt Filter.
+    const cellRects: SVGTemplateResult[] = [];
+    const addButtons: TemplateResult[] = [];
     
     // Bestimme die Grenzen für die Schleife
     let minX, maxX, minY, maxY;
@@ -1486,33 +1759,20 @@ export class BrokkoliArea extends LitElement {
                                 this._showAddPlantIndicator.x === x && 
                                 this._showAddPlantIndicator.y === y;
           
-          squares.push(html`
-            <svg 
-              class="cell ${isTarget ? 'highlight' : ''} ${isAddIndicator ? 'add-indicator' : ''}" 
-              style=${styleMap({
-                left: `${pixelPos.x}px`,
-                top: `${pixelPos.y}px`,
-                width: `${this._cellSize}px`,
-                height: `${this._cellSize}px`,
-                transform: 'translate(-50%, -50%)',
-                zIndex: isTarget || isAddIndicator ? '5' : '1'
-              })}
-            >
-              <rect 
-                x="0" 
-                y="0" 
-                width="${this._cellSize}" 
-                height="${this._cellSize}" 
-                fill="transparent" 
-                stroke="${isTarget ? 'var(--primary-color, #3498db)' : isAddIndicator ? 'var(--accent-color, #f3a95e)' : 'var(--divider-color, #e0e0e0)'}" 
-                stroke-width="${isTarget || isAddIndicator ? '2.5' : '0.8'}" 
-                stroke-opacity="${isTarget || isAddIndicator ? '1' : '0.4'}"
-                ${isTarget ? 'stroke-dasharray="5,3"' : ''}
-                rx="2" 
-                ry="2"
-              />
-            </svg>
-            ${isAddIndicator ? html`
+          cellRects.push(svg`
+            <rect 
+              class="grid-cell ${isTarget ? 'highlight' : ''} ${isAddIndicator ? 'add-indicator' : ''}"
+              x="${pixelPos.x - this._cellSize / 2}" 
+              y="${pixelPos.y - this._cellSize / 2}" 
+              width="${this._cellSize}" 
+              height="${this._cellSize}" 
+              rx="2" 
+              ry="2"
+            />
+          `);
+          
+          if (isAddIndicator) {
+            addButtons.push(html`
               <div 
                 class="add-plant-button"
                 style=${styleMap({
@@ -1533,8 +1793,8 @@ export class BrokkoliArea extends LitElement {
                 })}
                 @click=${(e: MouseEvent) => this._handleCellClick(e, x, y)}
               >+</div>
-            ` : ''}
-          `);
+            `);
+          }
         }
       }
     }
@@ -1547,13 +1807,14 @@ export class BrokkoliArea extends LitElement {
     
     // Haupt-Template rendern, OHNE den Dialog (der wird später separat gerendert)
     const mainTemplate = html`
-      <div class="container" 
+      <div class="container ${this._editMode ? 'edit-mode' : ''}" 
            style=${styleMap({ height: `${containerHeight}px` })} 
            @click=${this._handleContainerClick}>
         <div class="grid-background" style=${styleMap({ 
           transform: `translate(${offset}px, ${offset}px)` 
         })}>
-          ${squares}
+          <svg class="grid-svg">${cellRects}</svg>
+          ${addButtons}
         </div>
         
         <div class="cycle-layer">
@@ -1567,6 +1828,22 @@ export class BrokkoliArea extends LitElement {
         <div class="cycle-labels-layer"></div>
         
         ${this._renderSelectionHint()}
+        
+        <!-- Umschalter Ansicht <-> Bearbeiten. Sitzt links neben dem
+             Legendenknopf und ist genauso gross, damit beide im
+             eingeklappten Zustand als Paar wirken. -->
+        <div 
+          class="edit-toggle-container" 
+          style=${styleMap({ right: this.showLegend ? '58px' : '10px' })}
+        >
+          <button 
+            class="edit-toggle ${this._editMode ? 'active' : ''}"
+            title=${TranslationUtils.translateUI(this.hass, this._editMode ? 'area_edit_mode_on' : 'area_edit_mode_off')}
+            @click=${this._toggleEditMode}
+          >
+            <ha-icon icon=${this._editMode ? 'mdi:cursor-move' : 'mdi:cursor-default-outline'}></ha-icon>
+          </button>
+        </div>
         
         <!-- Legende einfügen -->
         ${this.showLegend ? html`
@@ -1598,137 +1875,146 @@ export class BrokkoliArea extends LitElement {
   }
   
   // Positioniert die Cycle-Gruppen-Rahmen mit einer komplett neuen Methode
+  // Rebuilding the frames tears down DOM and measures every member element,
+  // which forces a layout pass. Several property changes in one frame used to
+  // queue one full pass each; now they share a single pending one.
+  private _scheduleCycleGroupUpdate() {
+    if (this._cycleGroupTimer) return;
+    this._cycleGroupTimer = window.setTimeout(() => {
+      this._cycleGroupTimer = 0;
+      this._updateCycleGroups();
+    }, 100);
+  }
+
   private _updateCycleGroups() {
-    // Ausführen nach dem Rendern
-    setTimeout(() => {
-      this._cycleGroups.forEach(group => {
-        if (group.positions.length < 1) return;
-        
-        // Lösche vorhandene Rahmen für diese Gruppe
-        const groupId = `cycle-${group.name.replace(/\s+/g, '-')}`;
-        const frameContainer = this.shadowRoot?.getElementById(groupId);
-        if (!frameContainer) return;
-        
-        // Leere den Container
-        frameContainer.innerHTML = '';
-        
-        // Hole alle Mitglieder-Elemente dieser Gruppe aus dem DOM
-        const memberElements: HTMLElement[] = [];
-        group.members.forEach(entityId => {
-          const selector = `.member-wrapper[data-entity-id="${entityId}"]`;
-          const memberEl = this.shadowRoot?.querySelector(selector) as HTMLElement;
-          if (memberEl) memberElements.push(memberEl);
-        });
-        
-        if (memberElements.length < 1) return;
-        
-        // Identifiziere zusammenhängende Inseln von Pflanzen
-        const islands = this._identifyIslands(group.members);
-        
-        // Erstelle für jede Insel einen eigenen Rahmen
-        islands.forEach((island) => {
-          // Filtere die Elemente für diese Insel
-          const islandElements = memberElements.filter(el => {
-            const entityId = el.getAttribute('data-entity-id');
-            return entityId && island.includes(entityId);
-          });
-          
-          if (islandElements.length < 1) return;
-          
-          // Sammle die Positionen und Größen der Elemente
-          const elementData: {center: {x: number, y: number}, radius: number}[] = [];
-          let minX = Number.MAX_SAFE_INTEGER;
-          let minY = Number.MAX_SAFE_INTEGER;
-          let maxX = Number.MIN_SAFE_INTEGER;
-          let maxY = Number.MIN_SAFE_INTEGER;
-          
-          islandElements.forEach(el => {
-            const rect = el.getBoundingClientRect();
-            const containerRect = this.getBoundingClientRect();
-            
-            // Berechne die Position relativ zum Container
-            const left = rect.left - containerRect.left + rect.width / 2;
-            const top = rect.top - containerRect.top + rect.height / 2;
-            const radius = Math.max(rect.width, rect.height) / 2;
-            
-            elementData.push({
-              center: { x: left, y: top },
-              radius: radius
-            });
-            
-            // Aktualisiere die Bounding Box
-            minX = Math.min(minX, left - radius - 20);
-            minY = Math.min(minY, top - radius - 20);
-            maxX = Math.max(maxX, left + radius + 20);
-            maxY = Math.max(maxY, top + radius + 20);
-          });
-          
-          // Erstelle ein neues Rahmenelement für diese Insel
-          const islandFrame = document.createElement('div');
-          islandFrame.className = 'cycle-group-frame';
-          islandFrame.style.position = 'absolute';
-          islandFrame.style.boxSizing = 'border-box';
-          islandFrame.style.zIndex = '2';
-          islandFrame.style.pointerEvents = 'none';
-          islandFrame.style.left = `${minX}px`;
-          islandFrame.style.top = `${minY}px`;
-          islandFrame.style.width = `${maxX - minX}px`;
-          islandFrame.style.height = `${maxY - minY}px`;
-          
-          // Speichere die Rahmenposition für später
-          islandFrame.dataset.centerX = `${minX + (maxX - minX) / 2}`;
-          islandFrame.dataset.centerY = `${minY + (maxY - minY) / 2}`;
-          islandFrame.dataset.width = `${maxX - minX}`;
-          islandFrame.dataset.height = `${maxY - minY}`;
-          islandFrame.dataset.groupName = group.name;
-          islandFrame.dataset.groupColor = group.color || '#3388ff';
-          
-          // Erstelle ein SVG-Element für den Pfad
-          const svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-          svgElement.setAttribute('width', '100%');
-          svgElement.setAttribute('height', '100%');
-          svgElement.style.position = 'absolute';
-          svgElement.style.top = '0';
-          svgElement.style.left = '0';
-          svgElement.style.overflow = 'visible';
-          
-          // Berechne den Pfad für die Hüllkurve oder einen Kreis für einzelne Pflanzen
-          let pathData;
-          if (islandElements.length === 1) {
-            // Für einzelne Pflanzen: Erstelle einen Kreis
-            const el = elementData[0];
-            const radius = el.radius + 15;
-            pathData = `M ${el.center.x - minX - radius} ${el.center.y - minY} ` +
-                       `a ${radius} ${radius} 0 1 0 ${radius * 2} 0 ` +
-                       `a ${radius} ${radius} 0 1 0 ${-radius * 2} 0`;
-          } else {
-            // Für mehrere Pflanzen: Berechne die Hüllkurve
-            pathData = this._createHullPath(elementData, minX, minY);
-          }
-          
-          // Erstelle den Pfad
-          const pathElement = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-          pathElement.setAttribute('d', pathData);
-          pathElement.setAttribute('fill', 'none');
-          pathElement.setAttribute('stroke', group.color || '#3388ff');
-          pathElement.setAttribute('stroke-width', '2');
-          pathElement.setAttribute('stroke-linejoin', 'round');
-          pathElement.setAttribute('stroke-linecap', 'round');
-          
-          // Füge den Pfad zum SVG hinzu
-          svgElement.appendChild(pathElement);
-          
-          // Füge das SVG zum Rahmenelement hinzu
-          islandFrame.appendChild(svgElement);
-          
-          // Füge das Rahmenelement zum Container hinzu
-          frameContainer.appendChild(islandFrame);
-        });
+    // Measured once up front instead of once per member element.
+    const containerRect = this.getBoundingClientRect();
+    this._cycleGroups.forEach(group => {
+      if (group.positions.length < 1) return;
+      
+      // Lösche vorhandene Rahmen für diese Gruppe
+      const groupId = `cycle-${group.name.replace(/\s+/g, '-')}`;
+      const frameContainer = this.shadowRoot?.getElementById(groupId);
+      if (!frameContainer) return;
+      
+      // Leere den Container
+      frameContainer.innerHTML = '';
+      
+      // Hole alle Mitglieder-Elemente dieser Gruppe aus dem DOM
+      const memberElements: HTMLElement[] = [];
+      group.members.forEach(entityId => {
+        const selector = `.member-wrapper[data-entity-id="${entityId}"]`;
+        const memberEl = this.shadowRoot?.querySelector(selector) as HTMLElement;
+        if (memberEl) memberElements.push(memberEl);
       });
       
-      // Nachdem alle Rahmen erstellt wurden, erstelle die klickbaren Labels
-      this._createClickableCycleLabels();
-    }, 100);
+      if (memberElements.length < 1) return;
+      
+      // Identifiziere zusammenhängende Inseln von Pflanzen
+      const islands = this._identifyIslands(group.members);
+      
+      // Erstelle für jede Insel einen eigenen Rahmen
+      islands.forEach((island) => {
+        // Filtere die Elemente für diese Insel
+        const islandElements = memberElements.filter(el => {
+          const entityId = el.getAttribute('data-entity-id');
+          return entityId && island.includes(entityId);
+        });
+        
+        if (islandElements.length < 1) return;
+        
+        // Sammle die Positionen und Größen der Elemente
+        const elementData: {center: {x: number, y: number}, radius: number}[] = [];
+        let minX = Number.MAX_SAFE_INTEGER;
+        let minY = Number.MAX_SAFE_INTEGER;
+        let maxX = Number.MIN_SAFE_INTEGER;
+        let maxY = Number.MIN_SAFE_INTEGER;
+        
+        islandElements.forEach(el => {
+          const rect = el.getBoundingClientRect();
+          
+          // Berechne die Position relativ zum Container
+          const left = rect.left - containerRect.left + rect.width / 2;
+          const top = rect.top - containerRect.top + rect.height / 2;
+          const radius = Math.max(rect.width, rect.height) / 2;
+          
+          elementData.push({
+            center: { x: left, y: top },
+            radius: radius
+          });
+          
+          // Aktualisiere die Bounding Box
+          minX = Math.min(minX, left - radius - 20);
+          minY = Math.min(minY, top - radius - 20);
+          maxX = Math.max(maxX, left + radius + 20);
+          maxY = Math.max(maxY, top + radius + 20);
+        });
+        
+        // Erstelle ein neues Rahmenelement für diese Insel
+        const islandFrame = document.createElement('div');
+        islandFrame.className = 'cycle-group-frame';
+        islandFrame.style.position = 'absolute';
+        islandFrame.style.boxSizing = 'border-box';
+        islandFrame.style.zIndex = '2';
+        islandFrame.style.pointerEvents = 'none';
+        islandFrame.style.left = `${minX}px`;
+        islandFrame.style.top = `${minY}px`;
+        islandFrame.style.width = `${maxX - minX}px`;
+        islandFrame.style.height = `${maxY - minY}px`;
+        
+        // Speichere die Rahmenposition für später
+        islandFrame.dataset.centerX = `${minX + (maxX - minX) / 2}`;
+        islandFrame.dataset.centerY = `${minY + (maxY - minY) / 2}`;
+        islandFrame.dataset.width = `${maxX - minX}`;
+        islandFrame.dataset.height = `${maxY - minY}`;
+        islandFrame.dataset.groupName = group.name;
+        islandFrame.dataset.groupColor = group.color || '#3388ff';
+        
+        // Erstelle ein SVG-Element für den Pfad
+        const svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svgElement.setAttribute('width', '100%');
+        svgElement.setAttribute('height', '100%');
+        svgElement.style.position = 'absolute';
+        svgElement.style.top = '0';
+        svgElement.style.left = '0';
+        svgElement.style.overflow = 'visible';
+        
+        // Berechne den Pfad für die Hüllkurve oder einen Kreis für einzelne Pflanzen
+        let pathData;
+        if (islandElements.length === 1) {
+          // Für einzelne Pflanzen: Erstelle einen Kreis
+          const el = elementData[0];
+          const radius = el.radius + 15;
+          pathData = `M ${el.center.x - minX - radius} ${el.center.y - minY} ` +
+                     `a ${radius} ${radius} 0 1 0 ${radius * 2} 0 ` +
+                     `a ${radius} ${radius} 0 1 0 ${-radius * 2} 0`;
+        } else {
+          // Für mehrere Pflanzen: Berechne die Hüllkurve
+          pathData = this._createHullPath(elementData, minX, minY);
+        }
+        
+        // Erstelle den Pfad
+        const pathElement = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        pathElement.setAttribute('d', pathData);
+        pathElement.setAttribute('fill', 'none');
+        pathElement.setAttribute('stroke', group.color || '#3388ff');
+        pathElement.setAttribute('stroke-width', '2');
+        pathElement.setAttribute('stroke-linejoin', 'round');
+        pathElement.setAttribute('stroke-linecap', 'round');
+        
+        // Füge den Pfad zum SVG hinzu
+        svgElement.appendChild(pathElement);
+        
+        // Füge das SVG zum Rahmenelement hinzu
+        islandFrame.appendChild(svgElement);
+        
+        // Füge das Rahmenelement zum Container hinzu
+        frameContainer.appendChild(islandFrame);
+      });
+    });
+    
+    // Nachdem alle Rahmen erstellt wurden, erstelle die klickbaren Labels
+    this._createClickableCycleLabels();
   }
   
   // Überarbeitete Methode: Wählt alle Mitglieder eines Cycles aus oder hebt die Auswahl auf
@@ -2050,7 +2336,11 @@ export class BrokkoliArea extends LitElement {
       
       // Erstelle das klickbare Label
       const label = document.createElement('div');
-      label.className = 'clickable-cycle-label';
+      // Selecting a whole cycle is a selection, so it belongs to edit mode;
+      // outside it the label stays a label.
+      label.className = this._editMode
+        ? 'clickable-cycle-label'
+        : 'clickable-cycle-label static';
       label.textContent = groupName;
       
       // Setze nur die dynamischen Eigenschaften
@@ -2059,7 +2349,7 @@ export class BrokkoliArea extends LitElement {
       label.style.backgroundColor = groupColor;
       
       // Klick-Event
-      label.addEventListener('click', (e) => {
+      if (this._editMode) label.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         
@@ -2249,6 +2539,9 @@ export class BrokkoliArea extends LitElement {
 
   // Verbesserter Container-Klick-Handler
   private _handleContainerClick(e: MouseEvent) {
+    // Pflanzen anlegen und Auswahl gehören zum Bearbeiten-Modus.
+    if (!this._editMode) return;
+    
     // Prüfe, ob der Klick auf die Legende ging
     const path = e.composedPath();
     const clickedOnLegend = path.some(el => 
@@ -2331,6 +2624,8 @@ export class BrokkoliArea extends LitElement {
 
   // Neuer Event-Handler für Klicks auf das transparente Overlay
   private _handleOverlayClick(e: MouseEvent) {
+    if (!this._editMode) return;
+    
     // Setze die Auswahl zurück, um konsistentes Verhalten zu erzielen
     this._selectedMembers.clear();
     
@@ -2407,6 +2702,10 @@ export class BrokkoliArea extends LitElement {
 
   // Spezielle Behandlung für Touch-Events
   private _handleTouchStart(e: TouchEvent, entityId: string) {
+    // Ausserhalb des Bearbeiten-Modus bleibt der Touch ein normaler Tap, den
+    // _handleClick zum more-info-Dialog macht.
+    if (!this._editMode) return;
+    
     // Speichert, ob ein Drag gestartet wurde
     let dragStarted = false;
     
@@ -2688,7 +2987,10 @@ export class BrokkoliArea extends LitElement {
           }
           
           return html`
-            <div class="sensor-label ${animationClass}">
+            <div 
+              class="sensor-label ${animationClass}"
+              @click=${(e: MouseEvent) => this._handleSensorLabelClick(e, sensor.sensor)}
+            >
               <ha-icon 
                 icon="${sensor.icon || `mdi:${sensor.type}`}" 
                 style="color: ${iconColor};"
@@ -2810,6 +3112,9 @@ export class BrokkoliArea extends LitElement {
         if (response && typeof response === 'object' && 'result' in response && response.result) {
           // Daten im lokalen Cache speichern
           this._plantInfoCache[entityId] = { result: response.result as PlantInfo['result'] };
+          // The snapshot names the sensors behind the rings and badges, so the
+          // watch list the hass setter filters on has to be rebuilt.
+          this._watchedDirty = true;
         }
         
         return { entityId, success: true };

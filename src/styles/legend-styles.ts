@@ -82,7 +82,7 @@ export const legendStyles: CSSResult = css`
     border-radius: 50%;
     background-color: var(--secondary-background-color, #f5f5f5);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
     flex-shrink: 0; /* Verhindert Schrumpfen bei begrenztem Platz */
     margin: 1px 0; /* Reduzierter Abstand */
   }

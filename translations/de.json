@@ -86,7 +86,9 @@
       "edit": "Bearbeiten",
       "save": "Speichern",
       "legend_collapsed_mode_active": "Modus: Eingeklappt (Klick wechselt)",
-      "delete_selected": "Ausgewählte löschen"
+      "delete_selected": "Ausgewählte löschen",
+      "area_edit_mode_on": "Verschieben aktiv - Klick beendet den Bearbeiten-Modus",
+      "area_edit_mode_off": "Ansicht - Klick aktiviert Verschieben und Mehrfachauswahl"
     },
     "fields": {
       "friendly_name": "Name",

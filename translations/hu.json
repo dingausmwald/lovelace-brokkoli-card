@@ -304,7 +304,9 @@
       "edit": "Szerkesztés",
       "save": "Mentés",
       "legend_collapsed_mode_active": "Mód: Összecsukva (kattints a váltáshoz)",
-      "delete_selected": "Kijelöltek törlése"
+      "delete_selected": "Kijelöltek törlése",
+      "area_edit_mode_on": "Mozgatás mód bekapcsolva - kattints a szerkesztés befejezéséhez",
+      "area_edit_mode_off": "Nézet mód - kattints a mozgatás és többszörös kijelölés bekapcsolásához"
     },
     "sensors": {
       "temperature": "Hőmérséklet",

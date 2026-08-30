@@ -304,7 +304,9 @@
       "edit": "编辑",
       "save": "保存",
       "legend_collapsed_mode_active": "模式：已折叠（点击切换）",
-      "delete_selected": "删除所选"
+      "delete_selected": "删除所选",
+      "area_edit_mode_on": "移动模式已开启 — 点击退出编辑模式",
+      "area_edit_mode_off": "查看模式 — 点击启用移动和多选"
     },
     "sensors": {
       "temperature": "温度",

@@ -304,7 +304,9 @@
       "edit": "Edytuj",
       "save": "Zapisz",
       "legend_collapsed_mode_active": "Tryb: Zwinięty (kliknij, aby zmienić)",
-      "delete_selected": "Usuń zaznaczone"
+      "delete_selected": "Usuń zaznaczone",
+      "area_edit_mode_on": "Tryb przesuwania włączony - kliknij, aby wyjść z trybu edycji",
+      "area_edit_mode_off": "Tryb podglądu - kliknij, aby włączyć przesuwanie i zaznaczanie wielu roślin"
     },
     "sensors": {
       "temperature": "Temperatura",

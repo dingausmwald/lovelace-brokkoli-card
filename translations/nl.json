@@ -304,7 +304,9 @@
       "edit": "Bewerken",
       "save": "Opslaan",
       "legend_collapsed_mode_active": "Modus: Ingeklapt (klik om te wisselen)",
-      "delete_selected": "Selectie verwijderen"
+      "delete_selected": "Selectie verwijderen",
+      "area_edit_mode_on": "Verplaatsmodus aan - klik om de bewerkmodus te verlaten",
+      "area_edit_mode_off": "Weergavemodus - klik om verplaatsen en meervoudige selectie in te schakelen"
     },
     "sensors": {
       "temperature": "Temperatuur",

@@ -88,12 +88,9 @@ export default class BrokkoliAreaCard extends LitElement {
 
   // Wird aufgerufen, wenn Home Assistant aktualisiert wird
   set hass(hass: HomeAssistant) {
+    // _hass is reactive, so assigning it already schedules the update. The
+    // promise that used to request one added a microtask per state change.
     this._hass = hass;
-    
-    // Initialize translations before first render
-    TranslationUtils.initializeTranslations(hass).then(() => {
-      this.requestUpdate();
-    });
   }
 
   // Statische Methode, um das Konfigurationselement zu erhalten
@@ -139,10 +136,30 @@ export default class BrokkoliAreaCard extends LitElement {
     return entitiesInArea.map(entity => entity.entity_id);
   }
 
-  // Rendert die Karte
-  render(): HTMLTemplateResult {
-    if (!this.config || !this._hass) {
-      return html``;
+  // Which plants belong on this card is a registry question, but answering it
+  // walks all of hass.states -- thousands of entities, on every single state
+  // change. The answer only changes when the registries do, or when one of the
+  // plants it found disappears, so it is cached against exactly that.
+  private _entityCache?: {
+    entities: unknown;
+    devices: unknown;
+    config: BrokkoliAreaCardConfig;
+    result: string[];
+  };
+
+  private _getEntities(): string[] {
+    const hass = this._hass;
+    if (!hass || !this.config) return [];
+
+    const cache = this._entityCache;
+    if (
+      cache
+      && cache.entities === hass.entities
+      && cache.devices === hass.devices
+      && cache.config === this.config
+      && cache.result.every(entityId => hass.states[entityId])
+    ) {
+      return cache.result;
     }
 
     // Sammle alle Entitäten
@@ -165,7 +182,25 @@ export default class BrokkoliAreaCard extends LitElement {
     }
 
     // Filtere ungültige Entitäten
-    const validEntities = entities.filter(entityId => this._hass!.states[entityId]);
+    const result = entities.filter(entityId => hass.states[entityId]);
+
+    this._entityCache = {
+      entities: hass.entities,
+      devices: hass.devices,
+      config: this.config,
+      result,
+    };
+
+    return result;
+  }
+
+  // Rendert die Karte
+  render(): HTMLTemplateResult {
+    if (!this.config || !this._hass) {
+      return html``;
+    }
+
+    const validEntities = this._getEntities();
 
     const asLength = (v: number | string | undefined): string | null =>
       v === undefined || v === null ? null : (typeof v === 'number' ? `${v}px` : v);

@@ -35,7 +35,7 @@ export const positionStyles: CSSResult = css`
     color: var(--secondary-text-color);
   }
   
-  .grid-background, .cell, .members, .name-layer, .cycle-layer {
+  .grid-background, .grid-svg, .members, .name-layer, .cycle-layer {
     position: absolute;
     top: 0;
     left: 0;
@@ -48,22 +48,35 @@ export const positionStyles: CSSResult = css`
   .name-layer { z-index: 5; pointer-events: none; }
   .members { z-index: 3; }
   
-  .cell {
-    transform: translate(-50%, -50%);
+  /* The whole grid lives in ONE svg. Every cell used to be its own absolutely
+     positioned <svg> carrying a drop-shadow filter -- a hundred filtered
+     layers the compositor repainted on every re-render, for a shadow at 5%
+     alpha nobody can see. */
+  .grid-svg {
     pointer-events: none;
-    z-index: 1;
-    filter: drop-shadow(0px 1px 1px rgba(0, 0, 0, 0.05));
+    overflow: visible;
   }
   
-  .cell.highlight, .cell.add-indicator {
-    z-index: 2;
-    filter: drop-shadow(0px 2px 3px rgba(0, 0, 0, 0.1));
-    animation: pulse 1.5s infinite alternate;
+  .grid-cell {
+    fill: transparent;
+    stroke: var(--divider-color, #e0e0e0);
+    stroke-width: 0.8;
+    stroke-opacity: 0.4;
   }
   
-  .cell.add-indicator {
-    z-index: 3;
-    animation: pulse-accent 1.5s infinite alternate;
+  .grid-cell.highlight {
+    stroke: var(--primary-color, #3498db);
+    stroke-width: 2.5;
+    stroke-opacity: 1;
+    stroke-dasharray: 5 3;
+    animation: cell-pulse 1.5s infinite alternate;
+  }
+  
+  .grid-cell.add-indicator {
+    stroke: var(--accent-color, #f3a95e);
+    stroke-width: 2.5;
+    stroke-opacity: 1;
+    animation: cell-pulse 1.5s infinite alternate;
   }
   
   .plus-icon {
@@ -71,14 +84,11 @@ export const positionStyles: CSSResult = css`
     pointer-events: auto;
   }
   
-  @keyframes pulse {
-    from { opacity: 0.3; border-width: 1.5px; }
-    to { opacity: 0.9; border-width: 2.5px; }
-  }
-  
-  @keyframes pulse-accent {
-    from { opacity: 0.5; border-width: 1.5px; }
-    to { opacity: 1; border-width: 2.5px; }
+  /* Opacity only: the old keyframes also animated border-width, which the
+     <svg> box never had, so every frame cost a layout pass for nothing. */
+  @keyframes cell-pulse {
+    from { opacity: 0.4; }
+    to { opacity: 1; }
   }
   
   .member-wrapper {
@@ -92,10 +102,12 @@ export const positionStyles: CSSResult = css`
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: move;
+    cursor: pointer;
     width: calc(var(--cell-size) * 1.1);
     height: calc(var(--cell-size) * 1.1);
   }
+  
+  .container.edit-mode .member { cursor: move; }
   
   .member:not(.dragging) { transition: transform 0.2s ease; }
   .member:hover { filter: brightness(1.05); }
@@ -113,23 +125,25 @@ export const positionStyles: CSSResult = css`
     100% { transform: scale(1); }
   }
   
+  /* An alarm ring used to animate stroke-width and filter: brightness().
+     Both force a repaint of the ring layer on every single frame, times the
+     number of plants in alarm -- that is what made the browser sweat. Opacity
+     composites instead: the layer is painted once and only re-blended. The
+     extra weight is now a static stroke-width, not an animated one. */
   @keyframes sensor-pulse {
-    0% { 
-      stroke-width: 4px; 
-      filter: brightness(1);
-    }
-    100% { 
-      stroke-width: 8px; 
-      filter: brightness(1.8);
-    }
+    from { opacity: 0.35; }
+    to { opacity: 1; }
   }
   
-  .sensor-pulsating {
-    animation: sensor-pulse 1s infinite alternate ease-in-out;
-  }
-  
+  .sensor-pulsating,
   .pulsating {
     animation: sensor-pulse 1s infinite alternate ease-in-out;
+    will-change: opacity;
+  }
+  
+  .sensor-ring-fg.sensor-pulsating,
+  .sensor-ring-fg.pulsating {
+    stroke-width: 6px;
   }
   
   .add-plant-button {
@@ -260,6 +274,15 @@ export const positionStyles: CSSResult = css`
   
   .member:not(.selected):hover .member-image { cursor: pointer; }
   
+  /* Outside edit mode a badge is a shortcut to its own sensor's more-info
+     dialog, so it has to catch clicks even though the stack around it does
+     not. In edit mode it stays transparent to the mouse: a drag that starts
+     on a badge must reach the plant underneath. */
+  .container:not(.edit-mode) .sensor-label {
+    pointer-events: auto;
+    cursor: pointer;
+  }
+  
   .member-image ha-icon {
     --mdc-icon-size: 70%;
     color: var(--primary-color);
@@ -329,17 +352,26 @@ export const positionStyles: CSSResult = css`
     top: calc(95% - 26px);
   }
 
+  /* Hovering used to be tracked in a reactive state, so moving the mouse
+     across the room re-rendered every plant, ring and label. CSS knows who is
+     hovered without asking Lit. */
   .entity-strain.dragging,
-  .entity-strain.hovering {
+  .member-wrapper:hover .entity-strain {
     opacity: 1;
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
   }
 
   .entity-name.dragging,
-  .entity-name.hovering {
+  .member-wrapper:hover .entity-name {
     opacity: 1;
     font-weight: bold;
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+  }
+
+  /* The hovered plant has to win over its neighbours' inline z-index, which
+     is why this needs !important -- --z-index is what render() wrote there. */
+  .member-wrapper:hover {
+    z-index: calc(var(--z-index, 1) + 2) !important;
   }
   
   .cycle-group {
@@ -425,6 +457,18 @@ export const positionStyles: CSSResult = css`
     transform: translateX(-50%) scale(1.05);
   }
   
+  /* Outside edit mode the label does not select anything, so it must not
+     advertise that it would. */
+  .clickable-cycle-label.static {
+    cursor: default;
+  }
+  
+  .clickable-cycle-label.static:hover {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    filter: none;
+    transform: translateX(-50%);
+  }
+  
   .click-overlay {
     cursor: pointer;
     z-index: 3;
@@ -481,33 +525,27 @@ export const positionStyles: CSSResult = css`
   
   .sensor-label.sensor-pulsating {
     animation: label-pulse 1s infinite alternate ease-in-out;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+    will-change: transform, opacity;
   }
   
   .sensor-label.sensor-pulsating ha-icon,
   .sensor-label.sensor-pulsating .sensor-value {
     animation: sensor-color-pulse 1s infinite alternate ease-in-out;
+    will-change: opacity;
   }
   
+  /* transform and opacity are the only two properties the compositor can
+     animate without repainting. The box-shadow that used to grow along with
+     the scale is now a static, already-strong shadow. */
   @keyframes label-pulse {
-    0% { 
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-      transform: scale(1);
-      opacity: 0.9;
-    }
-    100% { 
-      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
-      transform: scale(1.15);
-      opacity: 1;
-    }
+    from { transform: scale(1); opacity: 0.9; }
+    to { transform: scale(1.15); opacity: 1; }
   }
   
   @keyframes sensor-color-pulse {
-    0% { 
-      filter: brightness(1);
-    }
-    100% { 
-      filter: brightness(1.8);
-    }
+    from { opacity: 1; }
+    to { opacity: 0.45; }
   }
   
   .sensor-label ha-icon {
@@ -523,6 +561,71 @@ export const positionStyles: CSSResult = css`
   .sensor-unit {
     opacity: 0.8;
     font-size: 0.7rem;
+  }
+  
+  /* Edit-mode toggle. Deliberately built to match the collapsed legend next
+     to it -- same 40px shell, same 28px circle -- so the two read as a pair. */
+  .edit-toggle-container {
+    position: absolute;
+    top: 10px;
+    z-index: 10;
+    width: 40px;
+    /* 40 not 36: matches the collapsed legend's shell exactly, so the two
+       buttons sit side by side as one pair. */
+    height: 40px;
+    background-color: var(--card-background-color, #fff);
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .edit-toggle {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background-color: var(--secondary-background-color, #f5f5f5);
+    color: var(--secondary-text-color);
+    border: none;
+    margin: 4px;
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+  
+  .edit-toggle ha-icon {
+    --mdc-icon-size: 18px;
+  }
+  
+  .edit-toggle:hover { transform: scale(1.05); }
+  
+  .edit-toggle.active {
+    background-color: var(--accent-color, #f3a95e);
+    color: white;
+  }
+  
+  /* A card scrolled out of view still burns frames on its alarm animations.
+     The IntersectionObserver in brokkoli-area sets this attribute; the
+     animations keep their state and resume where they left off. */
+  :host([data-offscreen]) * {
+    animation-play-state: paused !important;
+  }
+  
+  @media (prefers-reduced-motion: reduce) {
+    .grid-cell.highlight,
+    .grid-cell.add-indicator,
+    .sensor-pulsating,
+    .pulsating,
+    .sensor-label.sensor-pulsating,
+    .sensor-label.sensor-pulsating ha-icon,
+    .sensor-label.sensor-pulsating .sensor-value {
+      animation: none;
+    }
   }
   
   /* Anpassung der CSS-Variablen für die Sensorring-Farben, die auch für die Icons verwendet werden */

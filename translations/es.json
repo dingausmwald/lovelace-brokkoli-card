@@ -304,7 +304,9 @@
       "edit": "Editar",
       "save": "Guardar",
       "legend_collapsed_mode_active": "Modo: Plegado (clic para cambiar)",
-      "delete_selected": "Eliminar seleccionadas"
+      "delete_selected": "Eliminar seleccionadas",
+      "area_edit_mode_on": "Modo mover activo: haz clic para salir del modo de edición",
+      "area_edit_mode_off": "Modo vista: haz clic para activar mover y selección múltiple"
     },
     "sensors": {
       "temperature": "Temperatura",
