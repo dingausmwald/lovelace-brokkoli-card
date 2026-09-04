@@ -49,7 +49,6 @@ declare global {
     interface Window {
         ApexCharts: new (element: Element, options: unknown) => ApexChart;
         flatpickr: (element: Element, options: unknown) => FlatpickrInstance;
-        startTimestamp: number;
     }
 }
 
@@ -106,8 +105,14 @@ interface TooltipSensor {
     index: number;
 }
 
-export function setStartTimestamp(timestamp: number): void {
-    window.startTimestamp = timestamp;
+// Das Pflanz-Startdatum, an dem die "Tag N"-Achse und der Tooltip haengen, lag
+// frueher in window.startTimestamp -- einem einzigen Feld fuer ALLE Graphen der
+// Seite. Bei mehreren Pflanzen auf einem Dashboard ueberschrieb jede Instanz den
+// Wert der anderen, die zuletzt initialisierte gewann, und alle uebrigen zaehlten
+// ihre Tage ab einem fremden Datum. Es reist jetzt in der Chart-Konfiguration
+// mit, die ApexCharts den Formattern als `w.config` durchreicht.
+interface MitStartdatum {
+    brokkoliStart?: number;
 }
 
 // Findet den letzten Index in einem chronologisch sortierten x-Array, dessen
@@ -207,9 +212,9 @@ export const chartOptions = {
             rotateAlways: false,
             datetimeUTC: false,
             hideOverlappingLabels: true,
-            formatter: function(value: number, timestamp?: unknown, opts?: { w?: { globals?: { minX?: number; maxX?: number } } }) {
+            formatter: function(value: number, timestamp?: unknown, opts?: { w?: { config?: MitStartdatum; globals?: { minX?: number; maxX?: number } } }) {
                 const date = new Date(value);
-                const startDate = new Date(window.startTimestamp || date);
+                const startDate = new Date(opts?.w?.config?.brokkoliStart || date);
                 // Setze die Startzeit auf Mitternacht des Starttages
                 startDate.setHours(0, 0, 0, 0);
                 // Addiere 1 zur Tagesberechnung, damit der erste Tag Tag 1 ist
@@ -351,15 +356,16 @@ export const chartOptions = {
         shared: true,
         intersect: false,
         followCursor: false,
-        custom: function({ series, dataPointIndex, w }: { series: unknown[][]; seriesIndex: number; dataPointIndex: number; w: { config: { series: { name: string; unit?: string }[]; colors: string[] }; globals: { seriesX: number[][]; seriesRangeStart?: number[][]; seriesRangeEnd?: number[][] } } }) {
+        custom: function({ series, dataPointIndex, w }: { series: unknown[][]; seriesIndex: number; dataPointIndex: number; w: { config: MitStartdatum & { series: { name: string; unit?: string }[]; colors: string[] }; globals: { seriesX: number[][]; seriesRangeStart?: number[][]; seriesRangeEnd?: number[][] } } }) {
             try {
                 const timestamp = w.globals.seriesX[0]?.[dataPointIndex];
                 const date = new Date(timestamp ?? NaN);
                 const dateValid = !isNaN(date.getTime());
 
                 let daysSincePlanting = 0;
-                if (dateValid && window.startTimestamp) {
-                    const startMs = window.startTimestamp < 1e12 ? window.startTimestamp * 1000 : window.startTimestamp;
+                const start = w.config.brokkoliStart;
+                if (dateValid && start) {
+                    const startMs = start < 1e12 ? start * 1000 : start;
                     const startDate = new Date(startMs);
 
                     if (!isNaN(startDate.getTime())) {
@@ -506,6 +512,8 @@ export class FlowerGraph extends LitElement {
     private _sensors: FlowerSensor[] = [];
     // Verhindert, dass sich zwei Aufbauversuche ueberholen.
     private _chartBautGerade = false;
+    // Pflanz-Startdatum DIESER Pflanze -- Bezugspunkt der "Tag N"-Achse.
+    private _startTimestamp?: number;
 
     async connectedCallback() {
         super.connectedCallback();
@@ -1167,7 +1175,7 @@ export class FlowerGraph extends LitElement {
                 
                 if (dates.length > 0) {
                     const startDate = new Date(Math.min(...dates.map(d => d.getTime())));
-                    setStartTimestamp(startDate.getTime());
+                    this._startTimestamp = startDate.getTime();
                 }
             }
         }
@@ -1204,6 +1212,7 @@ export class FlowerGraph extends LitElement {
             ...chartOptions,
             series,
             colors,
+            brokkoliStart: this._startTimestamp,
             chart: {
                 ...chartOptions.chart,
                 events: {
@@ -1213,15 +1222,15 @@ export class FlowerGraph extends LitElement {
                         console.debug('Zoomed event triggered with xaxis:', xaxis);
                     },
                     beforeZoom: (chartContext: unknown, { xaxis }: { xaxis: { min: number; max: number } }) => {
-                        if (!xaxis || !window.startTimestamp) return;
+                        if (!xaxis || !this._startTimestamp) return;
 
                         // Kopiere die Werte, um sie zu modifizieren
                         let minX = xaxis.min;
                         let maxX = xaxis.max;
 
                         // Verhindere Zoomen vor Tag 1
-                        if (minX < window.startTimestamp) {
-                            minX = window.startTimestamp;
+                        if (minX < this._startTimestamp) {
+                            minX = this._startTimestamp;
                         }
 
                         // Verhindere Zoomen nach heute
