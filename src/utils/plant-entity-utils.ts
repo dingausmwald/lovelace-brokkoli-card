@@ -99,6 +99,35 @@ export class PlantEntityUtils {
     }
 
     /**
+     * Alle Entities, die an denselben Geraeten haengen wie die uebergebenen
+     * Pflanzen -- die Pflanzen selbst eingeschlossen.
+     *
+     * Bewusst ein einziger Durchlauf ueber die Registry statt buildSensorMap je
+     * Pflanze: die Registry enthaelt jede Entity der Installation, und pro
+     * Pflanze darueber zu laufen waere quadratisch.
+     */
+    static collectPlantEntityIds(hass: HomeAssistant, plantEntityIds: string[]): string[] {
+        const registry = (hass as unknown as {
+            entities?: Record<string, { entity_id: string; device_id?: string }>;
+        })?.entities;
+        if (!registry) return [...plantEntityIds];
+
+        const geraete = new Set<string>();
+        for (const plantEntityId of plantEntityIds) {
+            const deviceId = registry[plantEntityId]?.device_id;
+            if (deviceId) geraete.add(deviceId);
+        }
+
+        const ids = new Set<string>(plantEntityIds);
+        if (geraete.size === 0) return [...ids];
+
+        for (const eintrag of Object.values(registry)) {
+            if (eintrag.device_id && geraete.has(eintrag.device_id)) ids.add(eintrag.entity_id);
+        }
+        return [...ids];
+    }
+
+    /**
      * Baut die Struktur, die frueher der Websocket-Befehl plant/get_info
      * geliefert hat -- rein synchron aus Entity-Registry und hass.states.
      *

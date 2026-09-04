@@ -8,6 +8,7 @@ import { PlantEntityUtils } from './utils/plant-entity-utils';
 import { FilterUtils } from './utils/filter-utils';
 import { TranslationUtils } from './utils/translation-utils';
 import './components/plant-create-dialog';
+import { HassBeobachter } from './utils/hass-watch';
 
 // Konstanten für die Karte
 export const AREA_CARD_NAME = "brokkoli-area-card";
@@ -65,7 +66,12 @@ window.customCards.push({
 
 @customElement(AREA_CARD_NAME)
 export default class BrokkoliAreaCard extends LitElement {
-  @property({ attribute: false }) _hass?: HomeAssistant;
+  // Bewusst NICHT reaktiv -- siehe HassBeobachter. Wuerde diese Karte bei jedem
+  // hass-Update rendern, bekaeme die innere brokkoli-area ihr hass zwar weiter,
+  // aber um den Preis eines kompletten Renderdurchgangs der ganzen Flaeche.
+  _hass?: HomeAssistant;
+  @state() private _hassGeneration = 0;
+  private _beobachter = new HassBeobachter();
   @property() config?: BrokkoliAreaCardConfig;
 
   // Zustandsvariablen
@@ -87,10 +93,26 @@ export default class BrokkoliAreaCard extends LitElement {
   }
 
   // Wird aufgerufen, wenn Home Assistant aktualisiert wird
+  willUpdate(changedProps: Map<string, unknown>) {
+    super.willUpdate(changedProps);
+    if (changedProps.has('config')) this._beobachter.markiereVeraltet();
+  }
+
+  // Die innere brokkoli-area bekommt hass nur ueber einen Renderdurchgang dieser
+  // Karte. Beobachtet werden deshalb alle Pflanzen, die sie zeigen wuerde, samt
+  // allem, was an deren Geraeten haengt -- also genau das, was die innere Karte
+  // ihrerseits filtert.
+  private _beobachteteEntities(hass: HomeAssistant): string[] {
+    const pflanzen = this.config?.area
+      ? this._getPlantEntitiesInArea(this.config.area)
+      : this._getAllPlantEntities();
+    return PlantEntityUtils.collectPlantEntityIds(hass, pflanzen);
+  }
+
   set hass(hass: HomeAssistant) {
-    // _hass is reactive, so assigning it already schedules the update. The
-    // promise that used to request one added a microtask per state change.
+    const betrifftUns = this._beobachter.betrifftUns(hass, h => this._beobachteteEntities(h));
     this._hass = hass;
+    if (betrifftUns) this._hassGeneration++;
   }
 
   // Statische Methode, um das Konfigurationselement zu erhalten

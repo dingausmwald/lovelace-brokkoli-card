@@ -59,14 +59,6 @@ export class TranslationUtils {
         return typeof current === 'string' ? current : key;
     }
 
-    /**
-     * No-op — Translations sind bereits beim Modul-Load verfügbar (statischer
-     * Import). Bleibt async für Backwards-Compat mit Callern, die .then() machen.
-     */
-    static async initializeTranslations(_hass: HomeAssistant): Promise<void> {
-        // intentionally empty
-    }
-
     static translateField(hass: HomeAssistant, key: string): string {
         return this.getTranslation(hass, `frontend.fields.${key}`);
     }

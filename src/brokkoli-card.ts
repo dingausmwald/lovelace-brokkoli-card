@@ -10,6 +10,7 @@ import { moreInfo } from './utils/utils';
 import { TranslationUtils } from './utils/translation-utils';
 import { getSourceSensors } from './utils/sensor-source-utils';
 import { PlantEntityUtils } from './utils/plant-entity-utils';
+import { HassBeobachter } from './utils/hass-watch';
 import './components/plant-clone-dialog';
 import './components/plant-replace-sensors-dialog';
 import './components/plant-delete-dialog';
@@ -37,7 +38,12 @@ console.info(
 
 @customElement(CARD_NAME)
 export default class BrokkoliCard extends LitElement {
-    @property() _hass?: any;
+    // Bewusst NICHT reaktiv: hass wechselt bei jeder Zustandsaenderung im Haus.
+    // Ob das die Karte angeht, entscheidet _beobachter im Setter; nur dann
+    // steigt die Generation und Lit rendert neu.
+    _hass?: any;
+    @state() private _hassGeneration = 0;
+    private _beobachter = new HassBeobachter();
     @property() config?: BrokkoliCardConfig;
     @state() private _expanded: { [key: string]: boolean } = {
         attributes: false,
@@ -97,14 +103,45 @@ export default class BrokkoliCard extends LitElement {
         window.addEventListener('brokkoli-card-entity-selected', this._handleCardEntitySelected);
     }
 
+    willUpdate(changedProps: Map<string, unknown>) {
+        super.willUpdate(changedProps);
+        // Andere Pflanze, andere Entities -- die Beobachtungsliste neu bilden.
+        if (changedProps.has('config')
+            || changedProps.has('selectedPlantEntity')
+            || changedProps.has('_selectedEntities')) {
+            this._beobachter.markiereVeraltet();
+        }
+    }
+
+    // Worauf diese Karte reagieren muss: die Pflanze selbst, alles was an ihrem
+    // Geraet haengt, und bei Mehrfachauswahl die mitgezeigten Pflanzen.
+    private _beobachteteEntities(hass: HomeAssistant): string[] {
+        const entityId = this.selectedPlantEntity || this.config?.entity;
+        const wurzeln = [entityId, ...this._selectedEntities].filter(Boolean) as string[];
+        if (wurzeln.length === 0) return [];
+
+        const ids = new Set(PlantEntityUtils.collectPlantEntityIds(hass, wurzeln));
+
+        // Ein Cycle listet seine Mitglieder mit Namen und Zustand auf. Welche das
+        // sind, steht als Attribut an seiner growth_phase-Entity -- die selbst
+        // schon beobachtet wird, eine Aenderung der Mitgliederliste kommt also an.
+        for (const wurzel of wurzeln) {
+            const phaseId = PlantEntityUtils.buildSensorMap(hass, wurzel).growth_phase;
+            const mitglieder = phaseId
+                ? hass.states[phaseId]?.attributes.member_plants as string[] | undefined
+                : undefined;
+            mitglieder?.forEach(id => ids.add(id));
+        }
+
+        return [...ids];
+    }
+
     set hass(hass: HomeAssistant) {
+        // Vor der Zuweisung: der Beobachter vergleicht gegen das vorige hass.
+        const betrifftUns = this._beobachter.betrifftUns(hass, h => this._beobachteteEntities(h));
         this._hass = hass;
-        
-        // Initialize translations before first render
-        TranslationUtils.initializeTranslations(hass).then(() => {
-            this.requestUpdate();
-        });
-        
+        if (betrifftUns) this._hassGeneration++;
+
         // Wenn eine Plant ausgewählt wurde, verwende diese statt der Entity aus der Konfiguration
         if (this.selectedPlantEntity) {
             this.stateObj = hass.states[this.selectedPlantEntity];
@@ -119,13 +156,17 @@ export default class BrokkoliCard extends LitElement {
         const entityId = this.selectedPlantEntity || this.config?.entity;
         if (!entityId) return;
 
-        // Struktur und Werte: synchron, jedes Mal. Frueher hing hier ein
+        // Nichts, was diese Karte zeigt, hat sich bewegt: hass steht aktuell da,
+        // gerendert wird nicht. Das ist der eigentliche Gewinn -- ohne diese
+        // Schranke rendert die Karte bei jeder Zustandsaenderung im ganzen Haus.
+        if (!betrifftUns) return;
+
+        // Struktur und Werte: synchron. Frueher hing hier ein
         // plant/get_info-Aufruf, gedrosselt auf einen pro Sekunde -- also ein
         // Websocket-Roundtrip im Dauerbetrieb, pro Karte.
         this._rebuildPlantInfo(hass);
 
-        // Bilder: nur wenn sich die Bildliste tatsaechlich geaendert hat. Das
-        // Neurendern loest bereits die Zuweisung an _hass oben aus.
+        // Bilder: nur wenn sich die Bildliste tatsaechlich geaendert hat.
         if (this._berechneBildStand() !== this._bildStand) {
             this.get_data(hass).then(() => {
                 this.requestUpdate();

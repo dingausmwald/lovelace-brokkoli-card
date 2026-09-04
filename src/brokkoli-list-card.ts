@@ -11,6 +11,7 @@ import { BrokkoliListComponents } from './utils/brokkoli-list-components';
 import { SortUtils } from './utils/sort-utils';
 import { PlantEntityUtils } from './utils/plant-entity-utils';
 import { CellRenderer } from './utils/cell-renderer';
+import { HassBeobachter } from './utils/hass-watch';
 import { StateManager } from './utils/state-manager';
 import { TranslationUtils } from './utils/translation-utils';
 import './components/plant-create-dialog';
@@ -49,7 +50,10 @@ window.customCards.push({
 
 @customElement('brokkoli-list-card')
 export default class BrokkoliListCard extends LitElement {
-    @property() _hass?: HomeAssistant;
+    // Bewusst NICHT reaktiv -- siehe HassBeobachter.
+    _hass?: HomeAssistant;
+    @state() private _hassGeneration = 0;
+    private _beobachter = new HassBeobachter();
     @property() config?: BrokkoliListCardConfig;
     private plantDialog?: HTMLElement;
     @state() private _showBulkMenu = false;
@@ -58,7 +62,6 @@ export default class BrokkoliListCard extends LitElement {
 
     private plantEntities: HomeAssistantEntity[] = [];
     private plantIds = '';
-    private lastRefresh = 0;
     private readonly EDITABLE_PLANT_ATTRIBUTES = ConfigUtils.EDITABLE_PLANT_ATTRIBUTES;
     private stateManager?: StateManager;
 
@@ -80,23 +83,26 @@ export default class BrokkoliListCard extends LitElement {
         }
     }
 
+    // Die Liste zeigt jede Pflanze mit ihren Sensorspalten, beobachtet also alle
+    // Pflanzen samt allem, was an ihren Geraeten haengt.
+    private _beobachteteEntities(hass: HomeAssistant): string[] {
+        const pflanzen = PlantEntityUtils.getPlantEntities(hass).map(plant => plant.entity_id);
+        return PlantEntityUtils.collectPlantEntityIds(hass, pflanzen);
+    }
+
     set hass(hass: HomeAssistant) {
+        const betrifftUns = this._beobachter.betrifftUns(hass, h => this._beobachteteEntities(h));
         this._hass = hass;
-        if (!this.stateManager && hass) {
+        if (!hass) return;
+
+        if (!this.stateManager) {
             this.stateManager = new StateManager(
                 hass,
                 this.config,
                 () => this.requestUpdate()
             );
         }
-        
-        // Initialize translations before first render
-        if (hass) {
-            TranslationUtils.initializeTranslations(hass).then(() => {
-                this.requestUpdate();
-            });
-        }
-        
+
         // Die volle Aktualisierung laeuft, sobald sich die Menge der Pflanzen
         // aendert. Vorher lief sie nur beim allerersten hass-Update, und
         // _refreshExistingEntities geht ausschliesslich die bereits bekannte
@@ -105,14 +111,18 @@ export default class BrokkoliListCard extends LitElement {
         const ids = PlantEntityUtils.getPlantEntities(hass).map(plant => plant.entity_id).join(',');
         if (ids !== this.plantIds) {
             this.plantIds = ids;
+            this._beobachter.markiereVeraltet();
             this.updatePlantEntities();
-        } else if (Date.now() - this.lastRefresh > 2000) {
-            // Bei nachfolgenden Updates nur die vorhandenen Entitäten aktualisieren.
-            // Gedrosselt: hass feuert bei jeder Zustandsaenderung im ganzen System,
-            // und der Durchlauf baut jede Pflanze neu auf.
-            this.lastRefresh = Date.now();
-            this._refreshExistingEntities();
+            return;
         }
+
+        // Der Durchlauf baut jede Pflanze neu auf. Frueher lief er gedrosselt auf
+        // zwei Sekunden, weil hass bei jeder Zustandsaenderung im ganzen Haus
+        // feuert; jetzt laeuft er nur noch, wenn eine der gezeigten Entities sich
+        // wirklich bewegt hat -- und dann sofort statt bis zu zwei Sekunden spaeter.
+        if (!betrifftUns) return;
+        this._hassGeneration++;
+        this._refreshExistingEntities();
     }
 
     // Neue Methode, die nur vorhandene Entitäten aus dem Cache aktualisiert

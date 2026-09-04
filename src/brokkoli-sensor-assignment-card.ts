@@ -1,10 +1,11 @@
 import { CSSResult, HTMLTemplateResult, LitElement, html, css } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
 import { HomeAssistant, LovelaceCardEditor } from 'custom-card-helpers';
 import './components/sensor-assignment';
 import type { SensorAssignmentView } from './components/sensor-assignment';
 import './sensor-assignment-editor';
-import { TranslationUtils } from './utils/translation-utils';
+import { PlantEntityUtils } from './utils/plant-entity-utils';
+import { HassBeobachter } from './utils/hass-watch';
 
 export const SENSOR_ASSIGNMENT_CARD_NAME = 'brokkoli-sensor-assignment-card';
 export const SENSOR_ASSIGNMENT_CARD_EDITOR_NAME = 'brokkoli-sensor-assignment-card-editor';
@@ -49,7 +50,10 @@ window.customCards.push({
 
 @customElement(SENSOR_ASSIGNMENT_CARD_NAME)
 export default class BrokkoliSensorAssignmentCard extends LitElement {
-  @property({ attribute: false }) _hass?: HomeAssistant;
+  // Bewusst NICHT reaktiv -- siehe HassBeobachter.
+  _hass?: HomeAssistant;
+  @state() private _hassGeneration = 0;
+  private _beobachter = new HassBeobachter();
   @property() config?: BrokkoliSensorAssignmentCardConfig;
 
   setConfig(config: BrokkoliSensorAssignmentCardConfig): void {
@@ -82,11 +86,17 @@ export default class BrokkoliSensorAssignmentCard extends LitElement {
     return typeof height === 'number' ? `height: ${height}px;` : `height: ${height};`;
   }
 
+  // Die innere sensor-assignment arbeitet mit allen Pflanzen und ihren Metern;
+  // ihr hass kommt nur ueber einen Renderdurchgang dieser Karte.
+  private _beobachteteEntities(hass: HomeAssistant): string[] {
+    const pflanzen = PlantEntityUtils.getPlantEntities(hass, 'plant').map(p => p.entity_id);
+    return PlantEntityUtils.collectPlantEntityIds(hass, pflanzen);
+  }
+
   set hass(hass: HomeAssistant) {
+    const betrifftUns = this._beobachter.betrifftUns(hass, h => this._beobachteteEntities(h));
     this._hass = hass;
-    TranslationUtils.initializeTranslations(hass).then(() => {
-      this.requestUpdate();
-    });
+    if (betrifftUns) this._hassGeneration++;
   }
 
   public static async getConfigElement(): Promise<LovelaceCardEditor> {
