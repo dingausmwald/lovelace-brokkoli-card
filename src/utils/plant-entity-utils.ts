@@ -138,12 +138,23 @@ export class PlantEntityUtils {
             state: pflanze.state,
         };
 
+        // Die Grenzwerte kamen aus Number-Entities: get_info schickte eine Zahl
+        // oder null, nie einen Platzhalter. Die Verbraucher rechnen mit Number()
+        // weiter -- aus null wird 0, aus "unknown" wuerde NaN und damit ein
+        // kaputter Balken, solange die Entities nach einem Neustart noch nicht
+        // wiederhergestellt sind.
+        const grenzwert = (entityId?: string) => {
+            const roh = zustand(entityId)?.state;
+            if (roh === undefined || roh === 'unknown' || roh === 'unavailable') return null;
+            return zahl(roh);
+        };
+
         for (const [feld, quelle] of Object.entries(this.VIEW_SENSORS)) {
             const messwert = zustand(map[quelle.messwert]);
             if (!messwert) continue;
             view[feld] = {
-                max: quelle.grenze ? zahl(zustand(map[`max_${quelle.grenze}`])?.state) : undefined,
-                min: quelle.grenze ? zahl(zustand(map[`min_${quelle.grenze}`])?.state) : undefined,
+                max: quelle.grenze ? grenzwert(map[`max_${quelle.grenze}`]) : undefined,
+                min: quelle.grenze ? grenzwert(map[`min_${quelle.grenze}`]) : undefined,
                 current: zahl(messwert.state),
                 icon: messwert.attributes.icon,
                 unit_of_measurement: messwert.attributes.unit_of_measurement,
