@@ -168,16 +168,25 @@ export class PlantEntityUtils {
         for (const [tk, typ] of Object.entries(this.VIEW_HELPERS)) {
             const entity = zustand(map[tk]);
             if (!entity) continue;
+            // "unknown"/"unavailable" sind Platzhalter der Zustandsmaschine, keine
+            // Werte. In Python gab `Entity.state` hier None zurueck, get_info
+            // schickte also null -- und die Verbraucher pruefen auf Wahrheit.
+            // Der Cycle-Select etwa steht auf "unknown", solange die Pflanze in
+            // keinem Cycle ist; als String gelesen entstand daraus eine
+            // Cycle-Gruppe namens "unknown".
+            const roh = entity.state;
+            const leer = roh === 'unknown' || roh === 'unavailable';
+
             const eintrag: Record<string, unknown> = {
                 entity_id: entity.entity_id,
-                current: entity.state,
+                current: leer ? null : roh,
                 icon: entity.attributes.icon,
                 type: typ,
             };
             if (typ === 'select') {
                 eintrag.options = entity.attributes.options ?? [];
             } else if (typ === 'number') {
-                eintrag.current = zahl(entity.state);
+                eintrag.current = leer ? null : zahl(roh);
                 eintrag.unit_of_measurement = entity.attributes.unit_of_measurement;
                 eintrag.min = entity.attributes.min;
                 eintrag.max = entity.attributes.max;
