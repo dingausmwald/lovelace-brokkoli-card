@@ -1,5 +1,5 @@
 import { CSSResult, HTMLTemplateResult, LitElement, html } from 'lit';
-import { customElement } from 'lit/decorators.js';
+import { customElement, property } from 'lit/decorators.js';
 import { HomeAssistant } from 'custom-card-helpers';
 import { graphStyles } from '../styles/graph-styles';
 import { PlantEntityUtils } from '../utils/plant-entity-utils';
@@ -128,6 +128,27 @@ function findValueIndexAtOrBefore(xs: number[] | undefined, target: number): num
         }
     }
     return idx;
+}
+
+// Laedt ein Skript und wartet darauf. Ohne onerror-Behandlung loest das Promise
+// bei einem fehlgeschlagenen Request NIE auf -- ein blockierter oder nicht
+// erreichbarer CDN haengte damit den gesamten Chart-Aufbau dauerhaft auf, ohne
+// eine einzige Meldung zu hinterlassen.
+function skriptLaden(src: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error(`Skript nicht ladbar: ${src}`));
+        document.head.appendChild(script);
+    });
+}
+
+function stylesheetLaden(href: string): void {
+    const styleLink = document.createElement('link');
+    styleLink.rel = 'stylesheet';
+    styleLink.href = href;
+    document.head.appendChild(styleLink);
 }
 
 export const chartOptions = {
@@ -448,8 +469,15 @@ export const chartOptions = {
 
 @customElement('flower-graph')
 export class FlowerGraph extends LitElement {
-    public hass?: HomeAssistant;
-    public entityId?: string;
+    // Als einzige Komponente hatte der Graph diese beiden nie als reaktive
+    // Property deklariert -- alle Geschwister (timeline, gallery, consumption,
+    // history, sensor-assignment) tun es. Ein Setzen von aussen loeste damit
+    // kein Update aus: updated() lief nach dem ersten Durchgang praktisch nie
+    // mehr, und changedProps.has('hass') bzw. has('entityId') -- worauf die
+    // Methode ihre gesamte Aktualisierungslogik stuetzt -- konnten nie wahr
+    // werden. Stand der Chart nach firstUpdated() nicht, stand er nie.
+    @property({ attribute: false }) public hass?: HomeAssistant;
+    @property({ attribute: false }) public entityId?: string;
     private _chart?: ApexChart;
     private _data: ChartDataPoint[] = [];
     public _dateRange: [Date, Date] = [new Date(), new Date()];
@@ -476,26 +504,18 @@ export class FlowerGraph extends LitElement {
         { id: 'humidity', scale: 1, yaxis: 1, color: '#008FFB' }
     ];
     private _sensors: FlowerSensor[] = [];
+    // Verhindert, dass sich zwei Aufbauversuche ueberholen.
+    private _chartBautGerade = false;
 
     async connectedCallback() {
         super.connectedCallback();
         this._isConnected = true;
-        if (this.entityId && this.hass) {
-            // Lade nur die Scripts, aber initialisiere den Chart nicht hier
-            // Die eigentliche Initialisierung erfolgt in firstUpdated
-            await this._loadScripts();
-            await this._loadFlatpickr();
-
-            // Wenn die Komponente bereits einmal initialisiert war (firstUpdated()
-            // feuert nur einmal pro Instanz), aber Chart/Picker in disconnectedCallback
-            // zerstört wurden (z.B. HA-Dashboard-Tab-Wechsel: derselbe Custom-Element-
-            // Knoten wird disconnected statt neu erzeugt), hier neu aufbauen — sonst
-            // bleibt der Graph nach dem Zurückwechseln dauerhaft leer.
-            if (this._initialized && !this._chart) {
-                this._initDatePicker();
-                this._initChart();
-            }
-        }
+        // Chart und Picker werden in disconnectedCallback() zerstoert. HA-Dashboard-
+        // Sub-Tabs entfernen die Karte beim Wegwechseln nicht, sie disconnecten
+        // dieselbe Element-Instanz und connecten sie zurueck -- firstUpdated()
+        // laeuft dann nicht erneut. Der Aufbau ist wiederholbar und steigt von
+        // selbst aus, wenn schon ein Chart steht.
+        await this._chartAufbauen();
     }
 
     disconnectedCallback() {
@@ -512,35 +532,54 @@ export class FlowerGraph extends LitElement {
     }
 
     async firstUpdated() {
+        await this._chartAufbauen();
+    }
+
+    /**
+     * Baut Datepicker und Chart auf, sofern alles dafuer bereitsteht.
+     *
+     * Frueher stand das komplett in firstUpdated() -- und firstUpdated() feuert
+     * in Lit genau einmal je Element. Fehlten die Pflanzendaten in diesem einen
+     * Moment, stieg die Methode mit einer Warnung aus, _initialized blieb false,
+     * und es gab keinen Weg zurueck: updated() ruft nur updateGraphData(), das
+     * einen bestehenden Chart braucht, und die Reparatur in connectedCallback()
+     * greift erst ab _initialized. Der Graph blieb dauerhaft ohne Linien --
+     * waehrend Datepicker und Timeline normal dastanden, weil sie weder
+     * ApexCharts noch die Pflanzendaten brauchen. Auf einer Installation mit
+     * vielen Pflanzen war das der Normalfall, weil plant/get_info unter Last
+     * scheiterte.
+     *
+     * Deshalb ist der Aufbau jetzt wiederholbar und wird aus updated() erneut
+     * versucht, solange kein Chart steht.
+     */
+    private async _chartAufbauen(): Promise<void> {
+        if (this._chartBautGerade || this._chart) return;
         if (!this.entityId || !this.hass) return;
-        
-        // Lade zuerst alle benötigten Skripte
-        await this._loadScripts();
-        await this._loadFlatpickr();
-        
-        // Initialisiere DatePicker früh
-        this._initDatePicker();
-        
-        // Hole Pflanzendaten und warte explizit darauf
-        this._plantInfo = this._getPlantInfo();
-        if (!this._plantInfo) {
-            console.warn('Keine Pflanzeninformationen verfügbar');
-            return;
+
+        this._chartBautGerade = true;
+        try {
+            await this._loadScripts();
+            await this._loadFlatpickr();
+
+            if (!this._picker) this._initDatePicker();
+
+            this._plantInfo = this._getPlantInfo();
+            if (!this._plantInfo) return;   // spaeter erneut versuchen
+
+            this._updateSensorsFromPlantInfo();
+            await this.updateDateRange();
+
+            await this._initChart();
+            this.requestUpdate();
+
+            this._initialized = true;
+        } catch (fehler) {
+            // Etwa ein nicht erreichbarer CDN. Beim naechsten Update erneut
+            // versuchen statt still stehenzubleiben.
+            console.warn('Graph konnte nicht aufgebaut werden, Versuch wird wiederholt:', fehler);
+        } finally {
+            this._chartBautGerade = false;
         }
-            
-        // Aktualisiere die Sensorinformationen basierend auf den API-Daten
-        this._updateSensorsFromPlantInfo();
-        
-        // Aktualisiere den Datumsbereich
-        await this.updateDateRange();
-        
-        // Erst nach Laden aller Daten initialisieren wir den Chart
-        this._initChart();
-
-        // Fordern wir ein explizites Neurendern des Components an
-        this.requestUpdate();
-
-        this._initialized = true;
     }
 
     private _updateSensorsFromPlantInfo() {
@@ -646,61 +685,34 @@ export class FlowerGraph extends LitElement {
             return;
         }
 
-        const styleLink = document.createElement('link');
-        styleLink.rel = 'stylesheet';
-        styleLink.href = 'https://cdn.jsdelivr.net/npm/apexcharts@4.4.0/dist/apexcharts.css';
-        document.head.appendChild(styleLink);
-
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/apexcharts@4.4.0/dist/apexcharts.min.js';
-        
-        const loadPromise = new Promise((resolve) => {
-            script.onload = resolve;
-        });
-
-        document.head.appendChild(script);
-        await loadPromise;
+        stylesheetLaden('https://cdn.jsdelivr.net/npm/apexcharts@4.4.0/dist/apexcharts.css');
+        await skriptLaden('https://cdn.jsdelivr.net/npm/apexcharts@4.4.0/dist/apexcharts.min.js');
         this._scriptLoaded = true;
     }
 
     private async _loadFlatpickr() {
         if (window.flatpickr) return;
 
-        const styleLink = document.createElement('link');
-        styleLink.rel = 'stylesheet';
-        styleLink.href = 'https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css';
-        document.head.appendChild(styleLink);
+        stylesheetLaden('https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css');
+        await skriptLaden('https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js');
 
-        // Lade Flatpickr
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js';
-        
-        const loadPromise = new Promise((resolve) => {
-            script.onload = resolve;
-        });
-
-        document.head.appendChild(script);
-        await loadPromise;
-
-        // Lade deutsche Lokalisierung
-        const localeScript = document.createElement('script');
-        localeScript.src = 'https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/de.js';
-        
-        const localeLoadPromise = new Promise((resolve) => {
-            localeScript.onload = resolve;
-        });
-
-        document.head.appendChild(localeScript);
-        await localeLoadPromise;
+        // Die Lokalisierung ist Beiwerk: faellt sie aus, zeigt der Datepicker
+        // englische Monatsnamen -- kein Grund, den Chart nicht aufzubauen.
+        try {
+            await skriptLaden('https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/de.js');
+        } catch (fehler) {
+            console.warn('Flatpickr-Lokalisierung nicht ladbar, nutze Standard:', fehler);
+        }
     }
 
     async updated(changedProps: Map<string, unknown>) {
         super.updated(changedProps);
-        
-        // Nur beim ersten Mal die Scripts laden
-        if (!this._scriptLoaded) {
-            await this._loadScripts();
-            await this._loadFlatpickr();
+
+        // Steht noch kein Chart, ist der Aufbau frueher nicht durchgekommen --
+        // etwa weil die Pflanze zu diesem Zeitpunkt noch nicht in hass.states
+        // stand. Mit jedem Update erneut versuchen.
+        if (!this._chart) {
+            await this._chartAufbauen();
             return;
         }
         
