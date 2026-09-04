@@ -4,6 +4,7 @@ import { HomeAssistant } from 'custom-card-helpers';
 import { TranslationUtils } from '../utils/translation-utils';
 import { SENSOR_SOURCE_TYPES, getSourceSensors } from '../utils/sensor-source-utils';
 import { dialogStyles } from '../styles/dialog-styles';
+import { PlantEntityUtils } from '../utils/plant-entity-utils';
 
 interface PlantEntity {
     entity_id: string;
@@ -18,8 +19,8 @@ interface PlantInfoResult {
  * Sensoren einer Pflanze austauschen -- gemeinsam für Brokkoli- und List-Card.
  *
  * Welche Entity gerade als Quelle hängt, steht im Attribut `external_sensor`
- * der jeweiligen Plant-Sensor-Entity; deren ID kommt aus plant/get_info und ist
- * damit sprachneutral. Beim Stromverbrauch sitzt die Zuweisung auf der
+ * der jeweiligen Plant-Sensor-Entity; deren ID kommt sprachneutral aus der
+ * Entity-Registry. Beim Stromverbrauch sitzt die Zuweisung auf der
  * Gesamt-Entity (kWh), nicht auf der berechneten Watt-Entity.
  */
 const isElementDefined = customElements.get('plant-replace-sensors-dialog');
@@ -37,17 +38,9 @@ class PlantReplaceSensorsDialogClass extends LitElement {
         this._load();
     }
 
-    private async _load() {
+    private _load() {
         if (!this.hass || !this.plant) return;
-        try {
-            const antwort = await this.hass.callWS({
-                type: 'plant/get_info',
-                entity_id: this.plant.entity_id
-            }) as { result?: PlantInfoResult };
-            this._result = antwort?.result;
-        } catch (error) {
-            console.error('Error loading plant info:', error);
-        }
+        this._result = (PlantEntityUtils.buildPlantView(this.hass, this.plant.entity_id) ?? undefined) as PlantInfoResult | undefined;
     }
 
     /** Die Entity, an der die Zuweisung dieses Typs haengt. */

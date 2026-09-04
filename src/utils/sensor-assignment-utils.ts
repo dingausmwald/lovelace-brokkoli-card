@@ -223,16 +223,15 @@ export class SensorAssignmentUtils {
             .sort((a, b) => a.name.localeCompare(b.name));
     }
 
-    // Die internen Meter-Entities einer Pflanze je Typ. Nur DIESER Teil braucht
-    // den (gecachten) plant/get_info-Websocket-Call — er ändert sich praktisch
-    // nie, solange die Pflanze existiert.
+    // Die internen Meter-Entities einer Pflanze je Typ, abgeleitet aus der
+    // Entity-Registry.
     // power_consumption ist ein Sonderfall: die Quelle sitzt auf der TOTAL-kWh-
     // Entity, nicht auf der daraus berechneten CURRENT-Watt-Entity.
-    static async getPlantMeterEntities(hass: HomeAssistant, plantEntityId: string): Promise<{
+    static getPlantMeterEntities(hass: HomeAssistant, plantEntityId: string): {
         meters: Record<string, string | undefined>;
         growthPhaseEntity?: string;
-    }> {
-        const info = await PlantEntityUtils.getPlantInfo(hass, plantEntityId) as
+    } {
+        const info = PlantEntityUtils.buildPlantView(hass, plantEntityId) as
             (Record<string, { sensor?: string }> & {
                 diagnostic_sensors?: Record<string, { entity_id?: string }>;
                 helpers?: { growth_phase?: { entity_id?: string } };
@@ -247,8 +246,7 @@ export class SensorAssignmentUtils {
                 : info[t.key]?.sensor;
         }
         // Die Wachstumsphase steckt in einer eigenen select-Entity; ihre ID
-        // kommt sprachneutral aus plant/get_info, der Zustand dann live aus
-        // hass.states.
+        // kommt sprachneutral aus der Registry, der Zustand live aus hass.states.
         return { meters, growthPhaseEntity: info.helpers?.growth_phase?.entity_id };
     }
 

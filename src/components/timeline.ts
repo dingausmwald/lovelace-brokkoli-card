@@ -117,7 +117,7 @@ export class FlowerTimeline extends LitElement {
         try {
             // Verwende PlantEntityUtils, um die Pflanzen-Info zu holen
             // Dies optimiert API-Calls und nutzt den zentralen Cache
-            this._plantInfo = await PlantEntityUtils.getPlantInfo(this.hass, this.entityId);
+            this._plantInfo = PlantEntityUtils.buildPlantView(this.hass, this.entityId);
         } catch (err) {
             console.warn('Fehler beim Laden der Pflanzen-Info:', err);
             this._plantInfo = null;
@@ -134,7 +134,7 @@ export class FlowerTimeline extends LitElement {
         // Verwende PlantEntityUtils, um die Pflanzen-Info zu holen
         let plantInfo: unknown;
         try {
-            plantInfo = await PlantEntityUtils.getPlantInfo(this.hass, `plant.${plantName}`);
+            plantInfo = PlantEntityUtils.buildPlantView(this.hass, `plant.${plantName}`);
         } catch (err) {
             console.warn('Fehler beim Laden der Pflanzen-Info:', err);
             return [];

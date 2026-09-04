@@ -210,13 +210,7 @@ export class BrokkoliArea extends LitElement {
   @state() private _highlightCell: {x: number, y: number} | null = null;
   
   @state() private _plantInfoCache: Record<string, PlantInfo> = {};
-  @state() private _plantRetryTimeouts: Record<string, number> = {}; // Timeouts für Pflanzen-Ladungen
-  @state() private _plantLastLoaded: Record<string, number> = {}; // Zeitpunkt der letzten Ladung für jede Pflanze
   
-  // Timer für die verzögerte Datenaktualisierung
-  private _updateTimeout: number = 0;
-  private _lastPlantDataLoad = 0;
-
   // ResizeObserver erkennt sowohl Resize als auch Visibility-Changes
   // (z.B. Tab-Switch). window-resize verfehlt letzteren Fall.
   private _resizeObserver?: ResizeObserver;
@@ -303,7 +297,11 @@ export class BrokkoliArea extends LitElement {
       this._watchedDirty = true;
       this._positionsDirty = true;
     }
-    
+
+    // Der Datenbestand ist eine reine Ableitung aus Registry und States. Ihn
+    // hier aufzubauen kostet nur Lookups und haelt ihn ohne Timer aktuell.
+    this._rebuildPlantData();
+
     // Positions are only re-read when a location helper actually changed --
     // the hass setter decides that, not the fact that a render happened.
     if (this._positionsDirty && this.hass) {
@@ -329,12 +327,6 @@ export class BrokkoliArea extends LitElement {
     if (this._geometryChanged || GEOMETRY_KEYS.some(key => changedProps.has(key))) {
       this._geometryChanged = false;
       this._scheduleCycleGroupUpdate();
-    }
-    
-    // Wenn sich die Entitäten geändert haben
-    if (changedProps.has('entities')) {
-      // Starte die Ladung aller Pflanzendaten mit der neuen optimierten Methode
-      this._loadAllPlantData();
     }
     
     // Dialog-Handling - nur wenn sich _showAddPlantDialog geändert hat
@@ -383,10 +375,6 @@ export class BrokkoliArea extends LitElement {
     this.removeEventListener('plant-created', this._handlePlantCreated);
     
     // Lösche alle aktiven Timeouts
-    if (this._updateTimeout) {
-      clearTimeout(this._updateTimeout);
-      this._updateTimeout = 0;
-    }
     if (this._cycleGroupTimer) {
       clearTimeout(this._cycleGroupTimer);
       this._cycleGroupTimer = 0;
@@ -447,26 +435,25 @@ export class BrokkoliArea extends LitElement {
   private _rebuildWatchedEntities() {
     this._watchedDirty = false;
 
+    const hass = this._hass;
     const values = new Set<string>(this.entities);
     const positions = new Set<string>();
+    if (!hass) {
+      this._watchedValueEntities = [...values];
+      this._watchedPositionEntities = [];
+      return;
+    }
 
     for (const entityId of this.entities) {
       const helperId = this._locationHelperFor(entityId);
       if (helperId) positions.add(helperId);
 
-      const result = this._plantInfoCache[entityId]?.result;
-      if (!result) continue;
-
-      for (const [key, value] of Object.entries(result)) {
-        if (key === 'helpers') continue;
-        const sensor = (value as SensorData)?.sensor;
-        if (typeof sensor === 'string') values.add(sensor);
-      }
-
-      for (const helper of Object.values(result.helpers ?? {})) {
-        if (helper && typeof helper === 'object' && helper.entity_id) {
-          values.add(helper.entity_id);
-        }
+      // Direkt aus der Registry, nicht aus dem Datenbestand: der wird selbst
+      // erst in willUpdate() aufgebaut, und der Setter hier laeuft davor. Frueher
+      // hing die Beobachtungsliste am get_info-Schnappschuss -- solange der
+      // fehlte, sah die Karte keine Sensoraenderung und rief deshalb nie nach.
+      for (const sensorEntityId of Object.values(PlantEntityUtils.buildSensorMap(hass, entityId))) {
+        values.add(sensorEntityId);
       }
     }
 
@@ -614,7 +601,7 @@ export class BrokkoliArea extends LitElement {
       }
     });
     
-    this._cycleGroups = Object.entries(cycleGroups)
+    const neu = Object.entries(cycleGroups)
       .filter(([, members]) => members.length >= 2)
       .map(([name, members]) => ({
         name,
@@ -622,6 +609,16 @@ export class BrokkoliArea extends LitElement {
         members,
         positions: members.map(id => this._positions[id]).filter(Boolean)
       }));
+
+    // _cycleGroups steht in GEOMETRY_KEYS: eine Zuweisung laesst updated() jedes
+    // Member-Element im DOM nachmessen und erzwingt damit ein Layout. Diese
+    // Methode laeuft jetzt in jedem Renderdurchgang, also nur zuweisen, wenn sich
+    // Gruppen oder Mitglieder wirklich geaendert haben.
+    const signatur = (gruppen: typeof neu) =>
+      gruppen.map(g => `${g.name}:${g.members.join(',')}#${g.positions.length}`).join('|');
+    if (signatur(neu) !== signatur(this._cycleGroups)) {
+      this._cycleGroups = neu;
+    }
   }
   
   // Berechnet die Grenzen des belegten Bereichs
@@ -888,30 +885,14 @@ export class BrokkoliArea extends LitElement {
       let sensorRings: TemplateResult | '' = '';
 
       if (entityId.startsWith('plant.')) {
-        // API-Informationen aus dem PlantEntityUtils-Cache holen
-        // Da wir in einer Render-Methode sind, können wir kein await verwenden
-        // Stattdessen prüfen wir, ob die Daten bereits im lokalen Cache sind
+        // Der Bestand steht vor dem Rendern fest -- willUpdate() baut ihn auf.
+        // Frueher stiess das Rendern hier einen Websocket-Aufruf an, dessen
+        // Antwort ein weiteres Rendern ausloeste.
         if (this._plantInfoCache[entityId] && this._plantInfoCache[entityId].result) {
-          // Verwende die gecachten Daten für die Ringe
           sensorRings = this._renderPlantSensorRings(entityId);
         } else {
-          // Wenn noch keine Daten geladen wurden, zeige deaktivierte Ringe an
+          // Pflanze noch nicht in der Registry (frisch angelegt): leere Ringe.
           sensorRings = this._renderDisabledRings();
-          
-          // Starte den Ladevorgang im Hintergrund, wenn nicht bereits gestartet
-          if (this.hass) {
-            // Da wir im Render-Prozess sind, lösen wir die Anfrage einfach aus und lassen den Cache-Mechanismus arbeiten
-            PlantEntityUtils.getPlantInfo(this.hass, entityId)
-              .then(result => {
-                if (result) {
-                  // Cache das Ergebnis im lokalen Cache
-                  this._plantInfoCache[entityId] = { result: result as PlantInfo['result'] };
-                  // New snapshot -> new sensor entities behind the rings.
-                  this._watchedDirty = true;
-                  this.requestUpdate();
-                }
-              });
-          }
         }
       }
       
@@ -2856,25 +2837,7 @@ export class BrokkoliArea extends LitElement {
     this.requestUpdate();
   };
 
-  // Lädt die Pflanzendaten via WebSocket API für eine Entity
-  private async _loadPlantInfo() {
-    // Verwende die neue Methode stattdessen
-    await this._loadAllPlantData();
-  }
-
-  // Entferne die nicht mehr benötigte initPlantDataLoading-Methode, jetzt verwenden wir _loadAllPlantData
-  private _initPlantDataLoading() {
-    // Verweise auf die neue Methode
-    this._loadAllPlantData();
-  }
-  
-  // Diese Methode wird jetzt durch _loadAllPlantData ersetzt
-  private _loadPlantInfosWithDelay() {
-    // Verweise auf die neue Methode
-    this._loadAllPlantData();
-  }
-
-  // Rendert Sensorlabels für eine Pflanze basierend auf den plant/get_info Daten
+  // Rendert Sensorlabels für eine Pflanze
   private _renderSensorLabels(entityId: string): TemplateResult {
     const plantInfo = this._plantInfoCache[entityId];
     
@@ -3066,78 +3029,29 @@ export class BrokkoliArea extends LitElement {
     return this._userSettings.heatmapOpacity !== undefined ? this._userSettings.heatmapOpacity : 0.8; // Standard 80%
   }
 
-  // Neue Methode: Lädt alle Pflanzendaten auf einmal und aktualisiert sie synchronisiert
-  private async _loadAllPlantData() {
-    if (!this.hass) return;
-    
-    // Nur Pflanzen-Entitäten filtern (keine Cycles)
+  // Baut den Datenbestand aller Pflanzen neu auf.
+  //
+  // Frueher stand hier ein plant/get_info je Pflanze plus ein Timer, der das
+  // jede Minute wiederholte -- bei fuenfzig Pflanzen ein Dauerfeuer, das HA mit
+  // "Client unable to keep up with pending messages" quittierte. Jetzt kommt
+  // alles synchron aus Registry und hass.states, und der Aufruf haengt in
+  // willUpdate(): einmal pro Renderdurchgang, und wann gerendert wird,
+  // entscheidet bereits der hass-Setter ueber seine Beobachtungsliste.
+  private _rebuildPlantData() {
+    const hass = this._hass;
+    if (!hass) return;
+
+    // Nur Pflanzen-Entitäten (keine Cycles)
     const plantEntities = this.entities.filter(entityId => entityId.startsWith('plant.'));
     if (plantEntities.length === 0) return;
-    
-    // Frisch geladene Daten nicht sofort noch einmal holen: updated() ruft diese
-    // Methode bei jeder Entitaets-Aenderung auf. Der 10-Sekunden-Takt weiter
-    // unten kommt aber durch -- vorher stieg die Methode aus, sobald irgendetwas
-    // im Cache lag, und lud danach nie wieder nach: die Badges standen fuer den
-    // Rest der Sitzung auf den Werten des ersten Ladens.
-    const frisch = Date.now() - this._lastPlantDataLoad < 5000;
-    const vollstaendig = plantEntities.every(
-      entityId => this._plantInfoCache[entityId]?.result
-    );
 
-    if (frisch && vollstaendig) {
-      // Identifiziere die Cycle-Gruppen mit den vorhandenen Daten
-      this._identifyCycleGroups();
-      this.requestUpdate();
-      
-      // Plane eine einzige verzögerte Aktualisierung für alle Pflanzen
-      if (this._updateTimeout) {
-        clearTimeout(this._updateTimeout);
-      }
-      this._updateTimeout = window.setTimeout(() => {
-        this._loadAllPlantData();
-      }, 60000); // Einmal pro Minute; Messwerte kommen live aus hass.states
-      
-      return;
+    const bestand: Record<string, PlantInfo> = {};
+    for (const entityId of plantEntities) {
+      const view = PlantEntityUtils.buildPlantView(hass, entityId);
+      if (view) bestand[entityId] = { result: view as PlantInfo['result'] };
     }
-    
-    // Paralleles Laden aller Pflanzendaten
-    const loadPromises = plantEntities.map(async (entityId) => {
-      try {
-        const response = await this.hass!.callWS({
-          type: "plant/get_info",
-          entity_id: entityId,
-        });
-        
-        // Typsicheres Überprüfen der Antwort
-        if (response && typeof response === 'object' && 'result' in response && response.result) {
-          // Daten im lokalen Cache speichern
-          this._plantInfoCache[entityId] = { result: response.result as PlantInfo['result'] };
-          // The snapshot names the sensors behind the rings and badges, so the
-          // watch list the hass setter filters on has to be rebuilt.
-          this._watchedDirty = true;
-        }
-        
-        return { entityId, success: true };
-      } catch (err) {
-        console.error(`[FLOWER-AREA] Fehler beim Laden der Daten für ${entityId}:`, err);
-        return { entityId, success: false };
-      }
-    });
-    
-    // Warte, bis alle Daten geladen wurden
-    await Promise.all(loadPromises);
-    this._lastPlantDataLoad = Date.now();
-    
-    // Identifiziere die Cycle-Gruppen erst nach dem Laden aller Daten
+    this._plantInfoCache = bestand;
+
     this._identifyCycleGroups();
-    this.requestUpdate();
-    
-    // Plane eine einzige verzögerte Aktualisierung für alle Pflanzen
-    if (this._updateTimeout) {
-      clearTimeout(this._updateTimeout);
-    }
-    this._updateTimeout = window.setTimeout(() => {
-      this._loadAllPlantData();
-    }, 60000); // Einmal pro Minute; Messwerte kommen live aus hass.states
   }
 }

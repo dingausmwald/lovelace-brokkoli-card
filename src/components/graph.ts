@@ -522,7 +522,7 @@ export class FlowerGraph extends LitElement {
         this._initDatePicker();
         
         // Hole Pflanzendaten und warte explizit darauf
-        this._plantInfo = await this._getPlantInfo();
+        this._plantInfo = this._getPlantInfo();
         if (!this._plantInfo) {
             console.warn('Keine Pflanzeninformationen verfügbar');
             return;
@@ -761,19 +761,18 @@ export class FlowerGraph extends LitElement {
         }
     }
 
-    private async _getPlantInfo() {
+    private _getPlantInfo(): PlantInfo | null {
         if (!this.entityId || !this.hass) return null;
-        
-        // Verwende PlantEntityUtils, um die Pflanzen-Info zu holen
-        // Dies optimiert API-Calls und nutzt den zentralen Cache
-        return PlantEntityUtils.getPlantInfo(this.hass, this.entityId) as Promise<PlantInfo>;
+
+        // Struktur und Werte kommen synchron aus Registry und hass.states.
+        return PlantEntityUtils.buildPlantView(this.hass, this.entityId) as PlantInfo | null;
     }
 
     public async updateGraphData(redraw: boolean = true) {
         if (!this.entityId || !this.hass) return;
 
         // Hole Pflanzendaten aus der API
-        this._plantInfo = await this._getPlantInfo() as PlantInfo;
+        this._plantInfo = this._getPlantInfo();
         
         // Aktualisiere die Sensoren basierend auf den Pflanzendaten
         this._updateSensorsFromPlantInfo();

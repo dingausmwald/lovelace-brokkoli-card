@@ -111,7 +111,7 @@ export class FlowerHistory extends LitElement {
         // Verwende PlantEntityUtils, um die Pflanzen-Info zu holen
         let plantInfo: PlantInfo;
         try {
-            plantInfo = await PlantEntityUtils.getPlantInfo(this.hass, this.entityId);
+            plantInfo = PlantEntityUtils.buildPlantView(this.hass, this.entityId);
         } catch {
             return null;
         }
@@ -162,7 +162,7 @@ export class FlowerHistory extends LitElement {
         // Verwende PlantEntityUtils, um die Pflanzen-Info zu holen
         let plantInfo: PlantInfo;
         try {
-            plantInfo = await PlantEntityUtils.getPlantInfo(this.hass, `plant.${plantName}`);
+            plantInfo = PlantEntityUtils.buildPlantView(this.hass, `plant.${plantName}`);
         } catch {
             console.warn('Fehler beim Laden der Pflanzen-Info:');
             return [];
@@ -579,7 +579,7 @@ export class FlowerHistory extends LitElement {
         
         try {
             // PlantEntityUtils verwenden, um die Entity-IDs zu erhalten
-            const plantInfo = await PlantEntityUtils.getPlantInfo(this.hass, this.entityId);
+            const plantInfo = PlantEntityUtils.buildPlantView(this.hass, this.entityId);
             
             if (!plantInfo) {
                 this._addingEntry = false;

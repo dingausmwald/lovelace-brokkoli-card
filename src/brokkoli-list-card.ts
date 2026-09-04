@@ -123,7 +123,7 @@ export default class BrokkoliListCard extends LitElement {
         for (let i = 0; i < this.plantEntities.length; i++) {
             const plant = this.plantEntities[i];
             const currentEntity = this._hass.states[plant.entity_id] as HomeAssistantEntity;
-            const apiInfo = await PlantEntityUtils.getPlantInfo(this._hass, plant.entity_id);
+            const apiInfo = PlantEntityUtils.buildPlantView(this._hass, plant.entity_id);
             
             // Entity mit aktuellen Daten aktualisieren
             const sensorMap = this._buildSensorMap(apiInfo, plant.entity_id);
@@ -210,19 +210,12 @@ export default class BrokkoliListCard extends LitElement {
         // Pflanzenentitäten abrufen
         const plantEntities = PlantEntityUtils.getPlantEntities(this._hass);
         
-        // Starte die Pflanzendaten-Ladung für alle erkannten Pflanzenenitäten
-        PlantEntityUtils.initPlantDataLoading(
-            this._hass, 
-            plantEntities.map(plant => plant.entity_id)
-        );
-        
-        // Für jede Pflanze die API-Informationen abrufen und verarbeiten
+        // Für jede Pflanze die Struktur aus Registry und States ableiten
         const enrichedEntities: HomeAssistantEntity[] = [];
         
         for (const plant of plantEntities) {
             try {
-                // API-Informationen abrufen - nutzt jetzt den Cache
-                const apiInfo = await PlantEntityUtils.getPlantInfo(this._hass, plant.entity_id);
+                const apiInfo = PlantEntityUtils.buildPlantView(this._hass, plant.entity_id);
                 
                 // Sensor-Map erstellen
                 const sensorMap = this._buildSensorMap(apiInfo, plant.entity_id);
@@ -293,9 +286,6 @@ export default class BrokkoliListCard extends LitElement {
     disconnectedCallback(): void {
         super.disconnectedCallback();
         this.removeEventListener('flower-image-click', this._handleFlowerImageClick.bind(this));
-        
-        // Alle Timeouts bereinigen, wenn die Karte entfernt wird
-        PlantEntityUtils.clearAllTimeouts();
         this._removeDialog();
     }
 

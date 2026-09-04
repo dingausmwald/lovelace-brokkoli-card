@@ -150,7 +150,7 @@ export class FlowerConsumption extends LitElement {
 
     private async _loadPlantInfo(plantEntityId: string): Promise<void> {
         if (!this.hass) return;
-        const info = await PlantEntityUtils.getPlantInfo(this.hass, plantEntityId);
+        const info = PlantEntityUtils.buildPlantView(this.hass, plantEntityId);
         this._plantInfo = info as PlantInfoHelpers | null;
     }
 

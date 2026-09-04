@@ -9,6 +9,7 @@ import { CARD_EDITOR_NAME, CARD_NAME, default_show_bars, default_show_elements, 
 import { moreInfo } from './utils/utils';
 import { TranslationUtils } from './utils/translation-utils';
 import { getSourceSensors } from './utils/sensor-source-utils';
+import { PlantEntityUtils } from './utils/plant-entity-utils';
 import './components/plant-clone-dialog';
 import './components/plant-replace-sensors-dialog';
 import './components/plant-delete-dialog';
@@ -62,7 +63,8 @@ export default class BrokkoliCard extends LitElement {
     private _imageRotationInterval?: NodeJS.Timeout;
 
     private stateObj: HomeAssistantEntity | undefined;
-    private previousFetchDate: number;
+    // Signatur der zuletzt verarbeiteten Bildliste (Entity + Hauptbild + Bilder).
+    private _bildStand?: string;
     private _imageUrls: string[] = [];
 
     plantinfo: PlantInfo;
@@ -113,16 +115,18 @@ export default class BrokkoliCard extends LitElement {
             this.stateObj = undefined;
         }
 
-        if (!this.previousFetchDate) {
-            this.previousFetchDate = 0;
-        }
-        
-        // Nur get_data aufrufen wenn eine Entity verfügbar ist
-        // Bei listen_to ohne ausgewählte Entity soll kein WebSocket-Aufruf gemacht werden
-        const hasValidEntity = this.selectedPlantEntity || this.config?.entity;
-        
-        if (hasValidEntity && Date.now() > this.previousFetchDate + 1000) {
-            this.previousFetchDate = Date.now();
+        // Bei listen_to ohne ausgewaehlte Entity gibt es nichts aufzubauen.
+        const entityId = this.selectedPlantEntity || this.config?.entity;
+        if (!entityId) return;
+
+        // Struktur und Werte: synchron, jedes Mal. Frueher hing hier ein
+        // plant/get_info-Aufruf, gedrosselt auf einen pro Sekunde -- also ein
+        // Websocket-Roundtrip im Dauerbetrieb, pro Karte.
+        this._rebuildPlantInfo(hass);
+
+        // Bilder: nur wenn sich die Bildliste tatsaechlich geaendert hat. Das
+        // Neurendern loest bereits die Zuweisung an _hass oben aus.
+        if (this._berechneBildStand() !== this._bildStand) {
             this.get_data(hass).then(() => {
                 this.requestUpdate();
             });
@@ -1059,15 +1063,33 @@ export default class BrokkoliCard extends LitElement {
         this.requestUpdate();
     }
 
+    // Woran sich die Bildliste erkennen laesst: welche Pflanze, welches
+    // Hauptbild, welche Galerie.
+    private _berechneBildStand(): string {
+        const bilder = this.stateObj?.attributes.images as string[] | undefined;
+        return [
+            this.selectedPlantEntity || this.config?.entity || '',
+            this.stateObj?.attributes.entity_picture ?? '',
+            (bilder ?? []).join(','),
+        ].join('|');
+    }
+
+    // Baut die Pflanzenstruktur neu auf. Rein synchron aus Registry und States,
+    // also billig genug, um bei jeder Zustandsaenderung zu laufen.
+    private _rebuildPlantInfo(hass: HomeAssistant): void {
+        const entityId = this.selectedPlantEntity || this.config?.entity;
+        this.plantinfo = {
+            result: entityId ? (PlantEntityUtils.buildPlantView(hass, entityId) ?? {}) : {},
+        } as PlantInfo;
+    }
+
+    // Die Bildliste dagegen kostet: sortieren, die Phasen-Historie abfragen,
+    // die Rotation neu aufsetzen. Das laeuft nur, wenn sich an den Bildern
+    // wirklich etwas geaendert hat -- siehe _bildStand im hass-Setter.
     private async get_data(hass: HomeAssistant): Promise<void> {
         try {
-            // Wenn eine Plant ausgewählt ist, verwende deren Entity-ID, sonst die konfigurierte Entity
-            const entityId = this.selectedPlantEntity || this.config?.entity;
-            
-            this.plantinfo = await hass.callWS({
-                type: "plant/get_info",
-                entity_id: entityId,
-            });
+            this._rebuildPlantInfo(hass);
+            this._bildStand = this._berechneBildStand();
 
             if (this.stateObj?.attributes.images) {
                 const downloadPath = this.stateObj.attributes.download_path || '/local/images/plants/';

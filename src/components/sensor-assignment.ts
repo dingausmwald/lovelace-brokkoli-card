@@ -367,7 +367,7 @@ export class SensorAssignment extends LitElement {
         const hass = this.hass;
         const results = await Promise.all(
             this._plantDevices.map(async plant => {
-                const info = await SensorAssignmentUtils.getPlantMeterEntities(hass, plant.entityId);
+                const info = SensorAssignmentUtils.getPlantMeterEntities(hass, plant.entityId);
                 return [plant.entityId, info] as const;
             })
         );

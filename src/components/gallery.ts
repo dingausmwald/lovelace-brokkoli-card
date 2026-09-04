@@ -259,7 +259,7 @@ export class FlowerGallery extends LitElement {
         this._isLoading = true;
         try {
             // Verwende PlantEntityUtils, um die Pflanzen-Info zu holen
-            this._plantInfo = await PlantEntityUtils.getPlantInfo(this.hass, this.entityId);
+            this._plantInfo = PlantEntityUtils.buildPlantView(this.hass, this.entityId);
             // Lade die Bilder, nachdem die Pflanzeninfo geladen ist
             await this._initGallery();
         } catch (err) {
@@ -445,7 +445,7 @@ export class FlowerGallery extends LitElement {
         
         // Ansonsten verwende PlantEntityUtils, um die Pflanzen-Info zu holen
         try {
-            const newPlantInfo = await PlantEntityUtils.getPlantInfo(hass, entityId) as PlantInfo;
+            const newPlantInfo = PlantEntityUtils.buildPlantView(hass, entityId) as PlantInfo;
             if (!newPlantInfo?.helpers?.growth_phase?.entity_id) return null;
             
             const phaseEntityId = newPlantInfo.helpers.growth_phase.entity_id;

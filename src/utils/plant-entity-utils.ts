@@ -1,16 +1,10 @@
 import { HomeAssistant } from 'custom-card-helpers';
 import { HomeAssistantEntity } from '../types/brokkoli-list-card-types';
 
-export class PlantEntityUtils {
-    // Global cache for plant information
-    private static _plantInfoCache: Record<string, unknown> = {};
-    
-    // Timeouts for scheduled updates
-    private static _plantRetryTimeouts: Record<string, number> = {};
-    
-    // Timestamp of last update per plant
-    private static _plantLastLoaded: Record<string, number> = {};
+// Fallback, wenn die Pflanze keinen Download-Pfad im Attribut mitbringt.
+const DEFAULT_IMAGE_PATH = '/local/images/plants/';
 
+export class PlantEntityUtils {
     // Uebersetzt die translation_keys der Integration auf die Feld-IDs der Karten.
     private static readonly TK_ALIAS: Record<string, string> = {
         current_moisture: 'soil_moisture',
@@ -22,12 +16,52 @@ export class PlantEntityUtils {
         current_ppfd: 'ppfd_mol',
         current_power_consumption: 'power_consumption',
         moisture_consumption: 'water_consumption',
+        total_integral: 'total_ppfd_mol_integral',
     };
 
     // Bei den Grenzwerten zaehlt nur der Typ hinter min_/max_.
     private static readonly TYPE_ALIAS: Record<string, string> = {
         moisture: 'soil_moisture',
         humidity: 'air_humidity',
+    };
+
+    // Die Messgroessen, die plant/get_info als eigene Bloecke lieferte: Feldname
+    // in der Antwort -> translation_key der Messwert-Entity, dazu der Typ, unter
+    // dem die beiden Grenzwert-Entities (min_/max_) haengen.
+    private static readonly VIEW_SENSORS: Record<string, { messwert: string; grenze?: string }> = {
+        temperature: { messwert: 'current_temperature', grenze: 'temperature' },
+        illuminance: { messwert: 'current_illuminance', grenze: 'illuminance' },
+        moisture: { messwert: 'current_moisture', grenze: 'moisture' },
+        conductivity: { messwert: 'current_conductivity', grenze: 'conductivity' },
+        humidity: { messwert: 'current_humidity', grenze: 'humidity' },
+        dli: { messwert: 'dli', grenze: 'dli' },
+        water_consumption: { messwert: 'moisture_consumption', grenze: 'water_consumption' },
+        fertilizer_consumption: { messwert: 'fertilizer_consumption', grenze: 'fertilizer_consumption' },
+        power_consumption: { messwert: 'current_power_consumption', grenze: 'power_consumption' },
+        ph: { messwert: 'current_ph', grenze: 'ph' },
+    };
+
+    // Die Diagnose-Sensoren; ihr Feldname ist zugleich ihr translation_key.
+    private static readonly VIEW_DIAGNOSTICS: string[] = [
+        'energy_cost',
+        'total_power_consumption',
+        'total_integral',
+        'total_water_consumption',
+        'total_fertilizer_consumption',
+    ];
+
+    // Die Helfer, die der Nutzer selbst setzt -- Feldname = translation_key.
+    private static readonly VIEW_HELPERS: Record<string, 'select' | 'number' | 'text'> = {
+        growth_phase: 'select',
+        flowering_duration: 'number',
+        pot_size: 'number',
+        water_capacity: 'number',
+        lux_to_ppfd: 'number',
+        treatment: 'select',
+        health: 'number',
+        journal: 'text',
+        location: 'text',
+        cycle: 'select',
     };
 
     /**
@@ -37,8 +71,7 @@ export class PlantEntityUtils {
      * der device_id der Pflanze und traegt einen translation_key, der von der
      * Sprache der Installation unabhaengig ist. Aus Entity-IDs etwas
      * zusammenzubauen ("number.<pflanze>_max_bodenfeuchte") funktioniert nur auf
-     * deutschen Systemen, und der get_info-Schnappschuss kennt die Grenzwert-
-     * Entities gar nicht, nur ihre Zahlen.
+     * deutschen Systemen.
      *
      * Abgelegt wird unter beiden Namen: unter dem translation_key selbst und
      * unter der Feld-ID der Karten, damit beide Seiten nachschlagen koennen.
@@ -65,156 +98,118 @@ export class PlantEntityUtils {
         return map;
     }
 
-    static async getPlantInfo(hass: HomeAssistant, plantEntityId: string): Promise<unknown> {
-        // If data is in cache, use it
-        if (this._plantInfoCache[plantEntityId]) {
-            return this._plantInfoCache[plantEntityId];
+    /**
+     * Baut die Struktur, die frueher der Websocket-Befehl plant/get_info
+     * geliefert hat -- rein synchron aus Entity-Registry und hass.states.
+     *
+     * Der Befehl war ein Rueckschritt: jede Antwort wurde serverseitig neu
+     * berechnet und neu serialisiert (rund 160 Felder), waehrend HA States als
+     * gecachte Diffs verschickt, die sich alle Clients teilen. Zwei Poller
+     * riefen ihn im Sekundentakt, bis HA mit "Client unable to keep up with
+     * pending messages" die Verbindung schloss. Alles, was er lieferte, steht in
+     * der Registry (welche Entity zu welcher Pflanze gehoert) und in den States
+     * (Werte, Icons, Einheiten, Grenzen, Optionen) -- also hier.
+     *
+     * Die Form bleibt absichtlich identisch zur alten Antwort, damit die
+     * Verbraucher unveraendert weiterlesen koennen.
+     */
+    static buildPlantView(hass: HomeAssistant, plantEntityId: string): Record<string, unknown> | null {
+        const pflanze = hass?.states?.[plantEntityId];
+        if (!pflanze) return null;
+
+        const map = this.buildSensorMap(hass, plantEntityId);
+        const zustand = (entityId?: string) => (entityId ? hass.states[entityId] : undefined);
+
+        // get_info lieferte Messwerte als Zahlen (Python-Entities geben
+        // native_value zurueck), hass.states liefert Strings. "unavailable" und
+        // "unknown" bleiben stehen, so wie sie es auch dort taten.
+        const zahl = (wert?: string) => {
+            if (wert === undefined) return undefined;
+            const n = Number(wert);
+            return wert !== '' && Number.isFinite(n) ? n : wert;
+        };
+
+        const view: Record<string, unknown> = {
+            path: (pflanze.attributes.download_path as string) || DEFAULT_IMAGE_PATH,
+            device_type: plantEntityId.startsWith('cycle.') ? 'cycle' : 'plant',
+            entity_id: plantEntityId,
+            name: pflanze.attributes.friendly_name ?? plantEntityId,
+            icon: pflanze.attributes.icon,
+            state: pflanze.state,
+        };
+
+        for (const [feld, quelle] of Object.entries(this.VIEW_SENSORS)) {
+            const messwert = zustand(map[quelle.messwert]);
+            if (!messwert) continue;
+            view[feld] = {
+                max: quelle.grenze ? zahl(zustand(map[`max_${quelle.grenze}`])?.state) : undefined,
+                min: quelle.grenze ? zahl(zustand(map[`min_${quelle.grenze}`])?.state) : undefined,
+                current: zahl(messwert.state),
+                icon: messwert.attributes.icon,
+                unit_of_measurement: messwert.attributes.unit_of_measurement,
+                sensor: messwert.entity_id,
+            };
         }
-        
-        // Otherwise start an API call and schedule regular updates
-        return this._loadPlantInfoWithRetry(hass, plantEntityId);
-    }
-    
-    // Loads plant data and schedules regular refresh
-    private static async _loadPlantInfoWithRetry(hass: HomeAssistant, plantEntityId: string): Promise<unknown> {
-        try {
-            // Update the timestamp
-            this._plantLastLoaded[plantEntityId] = Date.now();
-            
-            const response = await hass.callWS({
-                type: "plant/get_info",
-                entity_id: plantEntityId,
-            });
-            
-            // The actual data is in the "result" object
-            const result = typeof response === 'object' && response !== null && 'result' in response 
-                ? (response as { result: Record<string, unknown> }).result 
-                : null;
-            
-            // Store result in cache
-            if (result) {
-                this._plantInfoCache[plantEntityId] = result;
+
+        const diagnose: Record<string, unknown> = {};
+        for (const tk of this.VIEW_DIAGNOSTICS) {
+            const entity = zustand(map[tk]);
+            if (!entity) continue;
+            diagnose[tk] = {
+                entity_id: entity.entity_id,
+                current: zahl(entity.state),
+                icon: entity.attributes.icon,
+                unit_of_measurement: entity.attributes.unit_of_measurement,
+            };
+        }
+        view.diagnostic_sensors = diagnose;
+
+        const helfer: Record<string, unknown> = {};
+        for (const [tk, typ] of Object.entries(this.VIEW_HELPERS)) {
+            const entity = zustand(map[tk]);
+            if (!entity) continue;
+            const eintrag: Record<string, unknown> = {
+                entity_id: entity.entity_id,
+                current: entity.state,
+                icon: entity.attributes.icon,
+                type: typ,
+            };
+            if (typ === 'select') {
+                eintrag.options = entity.attributes.options ?? [];
+            } else if (typ === 'number') {
+                eintrag.current = zahl(entity.state);
+                eintrag.unit_of_measurement = entity.attributes.unit_of_measurement;
+                eintrag.min = entity.attributes.min;
+                eintrag.max = entity.attributes.max;
+                eintrag.step = entity.attributes.step;
             }
-            
-            // Schedule next update for this plant in 5 seconds
-            this._scheduleNextUpdate(hass, plantEntityId);
-            
-            return result;
-        } catch (err) {
-            console.error(`[PLANT-ENTITY] Error in API call for ${plantEntityId}:`, err);
-            
-            // On error: try again in 10 seconds
-            this._scheduleNextUpdate(hass, plantEntityId, true);
-            
-            return null;
+            helfer[tk] = eintrag;
         }
-    }
-    
-    // Schedules the next update for a specific plant
-    private static _scheduleNextUpdate(hass: HomeAssistant, plantEntityId: string, isError: boolean = false): void {
-        // If a timeout already exists, clear it
-        if (this._plantRetryTimeouts[plantEntityId]) {
-            window.clearTimeout(this._plantRetryTimeouts[plantEntityId]);
-            delete this._plantRetryTimeouts[plantEntityId];
-        }
-        
-        // Alle fuenf Sekunden pro Pflanze war bei 50 Pflanzen ein Dauerfeuer von
-        // rund zehn Websocket-Aufrufen je Sekunde -- HA trennt die Verbindung mit
-        // "Client unable to keep up with pending messages", und dann schlaegt
-        // schlagartig JEDER Aufruf der Karte fehl. Messwerte kommen ohnehin aus
-        // hass.states; aus get_info stammen nur Struktur und Grenzwerte, die sich
-        // selten aendern.
-        this._plantRetryTimeouts[plantEntityId] = window.setTimeout(() => {
-            delete this._plantRetryTimeouts[plantEntityId];
-            // Execute another API call
-            this._loadPlantInfoWithRetry(hass, plantEntityId);
-        }, isError ? 60000 : 60000); // eine Minute, im Fehlerfall ebenso
-    }
-    
-    // Starts the initial loading of all plant data with a slight delay
-    static initPlantDataLoading(hass: HomeAssistant, plantEntities: string[]): void {
-        if (!hass || plantEntities.length === 0) return;
-        
-        // Clear all existing timeouts
-        this.clearAllTimeouts();
-        
-        // Start loading for each plant with slightly different initial delay
-        plantEntities.forEach((entityId) => {
-            // If data already exists in cache, plan only the next fetch
-            if (this._plantInfoCache[entityId]) {
-                if (!this._plantRetryTimeouts[entityId]) {
-                    this._scheduleNextUpdate(hass, entityId);
-                }
-                return;
-            }
-            
-            // Initial delay to avoid API overload
-            const initialDelay = 500 + Math.random() * 2000; // 0.5-2.5 seconds initial delay
-            
-            // Set a timeout for the initial fetch
-            this._plantRetryTimeouts[entityId] = window.setTimeout(() => {
-                delete this._plantRetryTimeouts[entityId];
-                this._loadPlantInfoWithRetry(hass, entityId);
-            }, initialDelay);
-        });
-    }
-    
-    // Deletes all timeouts (e.g., when the component is removed)
-    static clearAllTimeouts(): void {
-        Object.values(this._plantRetryTimeouts).forEach(timeoutId => {
-            window.clearTimeout(timeoutId);
-        });
-        this._plantRetryTimeouts = {};
+        view.helpers = helfer;
+
+        return view;
     }
 
     static getPlantEntities(hass: HomeAssistant, filter: 'plant' | 'cycle' | 'all' = 'all'): HomeAssistantEntity[] {
         return Object.values(hass.states)
             .filter((entity): entity is HomeAssistantEntity => {
                 if (
-                    typeof entity !== 'object' || 
-                    entity === null || 
-                    !('entity_id' in entity) || 
+                    typeof entity !== 'object' ||
+                    entity === null ||
+                    !('entity_id' in entity) ||
                     !('attributes' in entity) ||
                     typeof entity.entity_id !== 'string'
                 ) {
                     return false;
                 }
-                
+
                 const isPlant = entity.entity_id.startsWith('plant.');
                 const isCycle = entity.entity_id.startsWith('cycle.') && 'member_count' in (entity.attributes as Record<string, unknown>);
-                
+
                 if (filter === 'plant') return isPlant;
                 if (filter === 'cycle') return isCycle;
                 return isPlant || isCycle;
             });
-    }
-
-    static async updatePlantInfo(
-        hass: HomeAssistant,
-        plantEntities: HomeAssistantEntity[],
-        plantInfo: Map<string, unknown>
-    ): Promise<Map<string, unknown>> {
-        const updatedPlantInfo = new Map(plantInfo);
-        
-        // Determine plant entity IDs
-        const entityIds = plantEntities.map(plant => plant.entity_id);
-        
-        // Start initial loading of plant information
-        this.initPlantDataLoading(hass, entityIds);
-        
-        // Check cache for each plant and update if necessary
-        for (const plant of plantEntities) {
-            const cachedInfo = this._plantInfoCache[plant.entity_id] as Record<string, unknown> | null;
-            if (cachedInfo) {
-                updatedPlantInfo.set(plant.entity_id, cachedInfo);
-            } else if (!updatedPlantInfo.has(plant.entity_id)) {
-                // If no data in cache and not in plantInfo, set to null
-                // Data will be loaded asynchronously by initPlantDataLoading
-                updatedPlantInfo.set(plant.entity_id, null);
-            }
-        }
-        
-        return updatedPlantInfo;
     }
 
     static togglePlantSelection(
@@ -224,13 +219,13 @@ export class PlantEntityUtils {
     ): Set<string> {
         event?.stopPropagation();
         const updatedSelection = new Set(selectedPlants);
-        
+
         if (updatedSelection.has(entityId)) {
             updatedSelection.delete(entityId);
         } else {
             updatedSelection.add(entityId);
         }
-        
+
         return updatedSelection;
     }
 
