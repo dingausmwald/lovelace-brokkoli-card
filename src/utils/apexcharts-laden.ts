@@ -21,6 +21,8 @@ export type ApexKonstruktor = new (element: Element, options: unknown) => {
     updateSeries(series: unknown[], redraw?: boolean): void;
     destroy(): void;
     toggleSeries(seriesName: string): void;
+    hideSeries(seriesName: string): void;
+    showSeries(seriesName: string): void;
 };
 
 type FensterMitApex = Window & { ApexCharts?: ApexKonstruktor };

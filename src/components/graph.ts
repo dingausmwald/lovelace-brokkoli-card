@@ -1,5 +1,5 @@
 import { CSSResult, HTMLTemplateResult, LitElement, html } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { customElement, property, state } from 'lit/decorators.js';
 import { HomeAssistant } from 'custom-card-helpers';
 import { graphStyles } from '../styles/graph-styles';
 import { apexChartsLaden, apexStylesheetLaden, ApexKonstruktor } from '../utils/apexcharts-laden';
@@ -12,6 +12,8 @@ interface ApexChart {
     updateSeries(series: unknown[], redraw?: boolean): void;
     destroy(): void;
     toggleSeries(seriesName: string): void;
+    hideSeries(seriesName: string): void;
+    showSeries(seriesName: string): void;
     w?: {
         globals?: {
             initialSeries?: { name: string }[];
@@ -519,6 +521,10 @@ export class FlowerGraph extends LitElement {
     private _startTimestamp?: number;
     private _aufbauFehlversuche = 0;
     private _apex?: ApexKonstruktor;
+    // Welche Sensoren der Nutzer ueber die Legende ausgeblendet hat -- gehalten
+    // ueber die sprachneutrale sensor.id, nicht ueber den Serien-Namen, damit
+    // die Auswahl einen Sprachwechsel und jedes Neuladen der Daten uebersteht.
+    @state() private _versteckteSensoren: ReadonlySet<string> = new Set();
 
     async connectedCallback() {
         super.connectedCallback();
@@ -1000,6 +1006,8 @@ export class FlowerGraph extends LitElement {
             ]).flat();
 
             this._chart.updateSeries(series, redraw);
+            // updateSeries setzt die Sichtbarkeit zurueck -- Auswahl neu setzen.
+            this._sichtbarkeitAnwenden();
         }
 
         this._lastUpdate = Date.now();
@@ -1367,8 +1375,11 @@ export class FlowerGraph extends LitElement {
                 
                 ${this._plantInfo && this._sensors.length > 0 ? html`
                 <div class="custom-legend">
-                    ${this._sensors.map((sensor, index) => html`
-                        <div class="legend-item" @click=${() => this._toggleSeries(index * 2)}>
+                    ${this._sensors.map(sensor => html`
+                        <div
+                            class="legend-item ${this._versteckteSensoren.has(sensor.id) ? 'inactive' : ''}"
+                            @click=${() => this._toggleSeries(sensor.id)}
+                        >
                             <ha-icon icon="${sensor.icon || ''}" class="legend-marker"></ha-icon>
                             <span class="legend-text">${this._getSeriesName(sensor.id, false)}</span>
                         </div>
@@ -1379,35 +1390,50 @@ export class FlowerGraph extends LitElement {
         `;
     }
 
-    private _toggleSeries(baseIndex: number) {
-        if (!this._chart || !this.shadowRoot) return;
-        
-        try {
-            // Finde das entsprechende DOM-Element
-            const item = this.shadowRoot.querySelector(`.legend-item:nth-child(${Math.floor(baseIndex / 2) + 1})`);
-            if (!item) {
-                console.warn('Legend-Item nicht gefunden bei Index:', baseIndex);
-                return;
-            }
+    /**
+     * Blendet einen Sensor aus oder wieder ein.
+     *
+     * Der Zustand lag frueher ausschliesslich in einer CSS-Klasse am
+     * Legenden-Element und in den Interna von ApexCharts. Beides ueberlebt kein
+     * updateSeries(): die Linien kamen beim naechsten Datenabgleich zurueck,
+     * waehrend die Legende sie weiter als abgewaehlt zeigte. Jetzt haelt die
+     * Komponente die Auswahl selbst und stellt sie nach jedem Datenabgleich
+     * wieder her.
+     */
+    private _toggleSeries(sensorId: string) {
+        const versteckt = new Set(this._versteckteSensoren);
+        if (versteckt.has(sensorId)) versteckt.delete(sensorId);
+        else versteckt.add(sensorId);
+        this._versteckteSensoren = versteckt;
 
-            // Toggle aktiv/inaktiv Status im UI
-            item.classList.toggle('inactive');
-            
-            // Wenn das Chart initialisiert ist, toggle die Serien-Sichtbarkeit
-            if (this._chart && this._chart.w && this._chart.w.globals && this._chart.w.globals.initialSeries) {
-                // Hole die aktuellen Serien
-                const series = this._chart.w.globals.initialSeries;
-                if (!series || series.length <= baseIndex + 1) {
-                    console.warn('Serien nicht gefunden:', baseIndex);
-                    return;
-                }
+        const sensor = this._sensors.find(s => s.id === sensorId);
+        if (sensor) this._sensorAnwenden(sensor, versteckt.has(sensorId));
+    }
 
-                // Toggle die Sichtbarkeit beider Serien (Range und Line)
-                this._chart.toggleSeries(series[baseIndex].name);
-                this._chart.toggleSeries(series[baseIndex + 1].name);
+    /**
+     * Stellt die Auswahl nach einem Datenabgleich wieder her.
+     *
+     * updateSeries() zeigt grundsaetzlich wieder alles an, es ist also nur zu
+     * verstecken -- nichts einzublenden. Jeder Aufruf laesst ApexCharts neu
+     * zeichnen, deshalb wird hier nur angefasst, was wirklich versteckt gehoert.
+     */
+    private _sichtbarkeitAnwenden() {
+        if (!this._chart || this._versteckteSensoren.size === 0) return;
+        for (const sensor of this._sensors) {
+            if (this._versteckteSensoren.has(sensor.id)) this._sensorAnwenden(sensor, true);
+        }
+    }
+
+    /** Beide Serien eines Sensors -- Bereich und Mittellinie -- umschalten. */
+    private _sensorAnwenden(sensor: FlowerSensor, verstecken: boolean) {
+        if (!this._chart) return;
+        for (const name of [`${sensor.name}bereich`, sensor.name]) {
+            try {
+                if (verstecken) this._chart.hideSeries(name);
+                else this._chart.showSeries(name);
+            } catch (error) {
+                console.warn(`Serie ${name} liess sich nicht umschalten:`, error);
             }
-        } catch (error) {
-            console.error('Fehler beim Umschalten der Serien:', error);
         }
     }
 
