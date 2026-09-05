@@ -1,6 +1,7 @@
 import { CSSResult, HTMLTemplateResult, LitElement, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { HomeAssistant } from 'custom-card-helpers';
+import ApexCharts from 'apexcharts';
 import { graphStyles } from '../styles/graph-styles';
 import { PlantEntityUtils } from '../utils/plant-entity-utils';
 import { TranslationUtils } from '../utils/translation-utils';
@@ -47,7 +48,6 @@ interface PlantInfo {
 
 declare global {
     interface Window {
-        ApexCharts: new (element: Element, options: unknown) => ApexChart;
         flatpickr: (element: Element, options: unknown) => FlatpickrInstance;
     }
 }
@@ -134,6 +134,9 @@ function findValueIndexAtOrBefore(xs: number[] | undefined, target: number): num
     }
     return idx;
 }
+
+// Nach so vielen vergeblichen Anlaeufen gibt der Graph auf.
+const MAX_AUFBAU_VERSUCHE = 3;
 
 // Laedt ein Skript und wartet darauf. Ohne onerror-Behandlung loest das Promise
 // bei einem fehlgeschlagenen Request NIE auf -- ein blockierter oder nicht
@@ -514,10 +517,13 @@ export class FlowerGraph extends LitElement {
     private _chartBautGerade = false;
     // Pflanz-Startdatum DIESER Pflanze -- Bezugspunkt der "Tag N"-Achse.
     private _startTimestamp?: number;
+    private _aufbauFehlversuche = 0;
 
     async connectedCallback() {
         super.connectedCallback();
         this._isConnected = true;
+        // Neuer Anlauf nach einem echten Reconnect.
+        this._aufbauFehlversuche = 0;
         // Chart und Picker werden in disconnectedCallback() zerstoert. HA-Dashboard-
         // Sub-Tabs entfernen die Karte beim Wegwechseln nicht, sie disconnecten
         // dieselbe Element-Instanz und connecten sie zurueck -- firstUpdated()
@@ -563,6 +569,10 @@ export class FlowerGraph extends LitElement {
     private async _chartAufbauen(): Promise<void> {
         if (this._chartBautGerade || this._chart) return;
         if (!this.entityId || !this.hass) return;
+        // Ein Aufbau, der wirklich scheitert, scheitert bei jedem Versuch gleich.
+        // Ohne Obergrenze wiederholt updated() ihn endlos und fuellt die Konsole
+        // mit Hunderten identischer Meldungen.
+        if (this._aufbauFehlversuche >= MAX_AUFBAU_VERSUCHE) return;
 
         this._chartBautGerade = true;
         try {
@@ -572,7 +582,8 @@ export class FlowerGraph extends LitElement {
             if (!this._picker) this._initDatePicker();
 
             this._plantInfo = this._getPlantInfo();
-            if (!this._plantInfo) return;   // spaeter erneut versuchen
+            // Kein Fehlversuch: die Pflanze kann gleich auftauchen.
+            if (!this._plantInfo) return;
 
             this._updateSensorsFromPlantInfo();
             await this.updateDateRange();
@@ -580,13 +591,29 @@ export class FlowerGraph extends LitElement {
             await this._initChart();
             this.requestUpdate();
 
-            this._initialized = true;
+            // _initChart faengt seine Fehler selbst ab, also hier nachsehen,
+            // ob wirklich ein Chart steht.
+            if (this._chart) {
+                this._aufbauFehlversuche = 0;
+                this._initialized = true;
+            } else {
+                this._aufbauNotieren();
+            }
         } catch (fehler) {
-            // Etwa ein nicht erreichbarer CDN. Beim naechsten Update erneut
-            // versuchen statt still stehenzubleiben.
-            console.warn('Graph konnte nicht aufgebaut werden, Versuch wird wiederholt:', fehler);
+            console.warn('Graph konnte nicht aufgebaut werden:', fehler);
+            this._aufbauNotieren();
         } finally {
             this._chartBautGerade = false;
+        }
+    }
+
+    private _aufbauNotieren(): void {
+        this._aufbauFehlversuche++;
+        if (this._aufbauFehlversuche >= MAX_AUFBAU_VERSUCHE) {
+            console.error(
+                `Graph fuer ${this.entityId} nach ${MAX_AUFBAU_VERSUCHE} Versuchen aufgegeben. `
+                + 'Neu versucht wird erst nach einem Neuaufbau der Karte.'
+            );
         }
     }
 
@@ -687,14 +714,19 @@ export class FlowerGraph extends LitElement {
         return this._dateRange;
     }
 
+    // ApexCharts kommt aus dem Bundle, nicht von window.
+    //
+    // Frueher hiess es: liegt schon ein window.ApexCharts vor, nimm das. Auf einer
+    // Installation mit apexcharts-card und cropsteering-card liegt dort aber deren
+    // Build -- und deren ApexCharts trifft auf das SVG.js der jeweils anderen
+    // Karte. Ergebnis war "TypeError: t.put is not a function" mitten in fremdem
+    // Code, jedes Mal wenn diese Karte einen Chart bauen wollte. Wir bringen
+    // unsere eigene Version mit und fassen den globalen Namen nicht mehr an.
     private async _loadScripts() {
-        if (this._scriptLoaded || window.ApexCharts) {
-            this._scriptLoaded = true;
-            return;
-        }
-
+        if (this._scriptLoaded) return;
+        // Nur das Stylesheet kommt weiterhin von aussen; faellt es aus, sieht der
+        // Chart schlichter aus, gebaut wird er trotzdem.
         stylesheetLaden('https://cdn.jsdelivr.net/npm/apexcharts@4.4.0/dist/apexcharts.css');
-        await skriptLaden('https://cdn.jsdelivr.net/npm/apexcharts@4.4.0/dist/apexcharts.min.js');
         this._scriptLoaded = true;
     }
 
@@ -715,6 +747,9 @@ export class FlowerGraph extends LitElement {
 
     async updated(changedProps: Map<string, unknown>) {
         super.updated(changedProps);
+
+        // Andere Pflanze: der neue Aufbau bekommt seine Versuche zurueck.
+        if (changedProps.has('entityId')) this._aufbauFehlversuche = 0;
 
         // Steht noch kein Chart, ist der Aufbau frueher nicht durchgekommen --
         // etwa weil die Pflanze zu diesem Zeitpunkt noch nicht in hass.states
@@ -1124,11 +1159,6 @@ export class FlowerGraph extends LitElement {
     }
 
     private async _initChart() {
-        if (!window.ApexCharts) {
-            console.warn('ApexCharts ist noch nicht geladen');
-            return;
-        }
-
         // Warte auf das nächste Render
         await new Promise(resolve => requestAnimationFrame(resolve));
 
@@ -1321,7 +1351,7 @@ export class FlowerGraph extends LitElement {
         };
 
         try {
-            this._chart = new window.ApexCharts(chartElement, options);
+            this._chart = new ApexCharts(chartElement, options) as unknown as ApexChart;
             await this._chart.render();
             this.updateGraphData();  // Initial update
         } catch (error) {

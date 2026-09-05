@@ -1,3 +1,4 @@
+import ApexCharts from 'apexcharts';
 import { LitElement, html, TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { HomeAssistant, fireEvent } from 'custom-card-helpers';
@@ -157,9 +158,7 @@ export class FlowerConsumption extends LitElement {
     static styles = style;
 
     async firstUpdated() {
-        if (!window.ApexCharts) {
-            await this._loadApexChartsScript();
-        }
+        await this._loadApexChartsScript();
         // Die Initialisierung des Charts wird jetzt vollständig von updated übernommen
         // Wir laden hier nur die ApexCharts-Bibliothek
     }
@@ -456,14 +455,7 @@ ${TranslationUtils.translateUI(this.hass, 'no_completed_phases')}
 
     private async _initPieChart(plantName: string) {
         // Prüfe ob ApexCharts verfügbar ist
-        if (!window.ApexCharts) {
-            try {
-                await this._loadApexChartsScript();
-            } catch (e) {
-                console.error('Fehler beim Laden von ApexCharts:', e);
-                return;
-            }
-        }
+        await this._loadApexChartsScript();
 
         // Prüfe, ob bereits ein Chart existiert
         const chartExists = this._charts.has('pie');
@@ -764,29 +756,18 @@ ${TranslationUtils.translateUI(this.hass, 'no_completed_phases')}
             }
         }
 
-        const chart = new window.ApexCharts(chartElement, options);
+        const chart = new ApexCharts(chartElement, options) as unknown as ApexChart;
         await chart.render();
         this._charts.set('pie', chart);
     }
 
+    // ApexCharts kommt aus dem Bundle -- siehe die Begruendung in graph.ts.
+    // Hier bleibt nur noch das Stylesheet zu holen.
     private async _loadApexChartsScript() {
         const styleLink = document.createElement('link');
         styleLink.rel = 'stylesheet';
         styleLink.href = 'https://cdn.jsdelivr.net/npm/apexcharts@4.4.0/dist/apexcharts.css';
         document.head.appendChild(styleLink);
-
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/apexcharts@4.4.0/dist/apexcharts.min.js';
-        
-        const loadPromise = new Promise((resolve) => {
-            script.onload = () => {
-                // Warte einen kurzen Moment, bis ApexCharts wirklich verfügbar ist
-                setTimeout(resolve, 100);
-            };
-        });
-
-        document.head.appendChild(script);
-        await loadPromise;
     }
 
     updated(changedProps: Map<string, unknown>) {
