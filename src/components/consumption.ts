@@ -1,10 +1,10 @@
-import ApexCharts from 'apexcharts';
 import { LitElement, html, TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { HomeAssistant, fireEvent } from 'custom-card-helpers';
 import { style } from '../styles/consumption-styles';
 import { TranslationUtils } from '../utils/translation-utils';
 import { PlantEntityUtils } from '../utils/plant-entity-utils';
+import { apexChartsLaden, ApexKonstruktor } from '../utils/apexcharts-laden';
 
 interface ApexChart {
     render(): Promise<void>;
@@ -148,6 +148,7 @@ export class FlowerConsumption extends LitElement {
     @state() private _plantInfo: PlantInfoHelpers | null = null;
     private _lastOptions: Map<string, ApexChartsOptions> = new Map();
     private _lastPhaseData: Map<string, string> = new Map();
+    private _apex?: ApexKonstruktor;
 
     private async _loadPlantInfo(plantEntityId: string): Promise<void> {
         if (!this.hass) return;
@@ -756,18 +757,16 @@ ${TranslationUtils.translateUI(this.hass, 'no_completed_phases')}
             }
         }
 
-        const chart = new ApexCharts(chartElement, options) as unknown as ApexChart;
+        if (!this._apex) return;
+        const chart = new this._apex(chartElement, options) as unknown as ApexChart;
         await chart.render();
         this._charts.set('pie', chart);
     }
 
-    // ApexCharts kommt aus dem Bundle -- siehe die Begruendung in graph.ts.
-    // Hier bleibt nur noch das Stylesheet zu holen.
+    // Eigene, gepinnte Instanz statt window.ApexCharts -- siehe
+    // utils/apexcharts-laden.ts.
     private async _loadApexChartsScript() {
-        const styleLink = document.createElement('link');
-        styleLink.rel = 'stylesheet';
-        styleLink.href = 'https://cdn.jsdelivr.net/npm/apexcharts@4.4.0/dist/apexcharts.css';
-        document.head.appendChild(styleLink);
+        this._apex = await apexChartsLaden();
     }
 
     updated(changedProps: Map<string, unknown>) {

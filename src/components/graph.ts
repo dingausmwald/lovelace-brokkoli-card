@@ -1,8 +1,8 @@
 import { CSSResult, HTMLTemplateResult, LitElement, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { HomeAssistant } from 'custom-card-helpers';
-import ApexCharts from 'apexcharts';
 import { graphStyles } from '../styles/graph-styles';
+import { apexChartsLaden, apexStylesheetLaden, ApexKonstruktor } from '../utils/apexcharts-laden';
 import { PlantEntityUtils } from '../utils/plant-entity-utils';
 import { TranslationUtils } from '../utils/translation-utils';
 
@@ -518,6 +518,7 @@ export class FlowerGraph extends LitElement {
     // Pflanz-Startdatum DIESER Pflanze -- Bezugspunkt der "Tag N"-Achse.
     private _startTimestamp?: number;
     private _aufbauFehlversuche = 0;
+    private _apex?: ApexKonstruktor;
 
     async connectedCallback() {
         super.connectedCallback();
@@ -714,19 +715,12 @@ export class FlowerGraph extends LitElement {
         return this._dateRange;
     }
 
-    // ApexCharts kommt aus dem Bundle, nicht von window.
-    //
-    // Frueher hiess es: liegt schon ein window.ApexCharts vor, nimm das. Auf einer
-    // Installation mit apexcharts-card und cropsteering-card liegt dort aber deren
-    // Build -- und deren ApexCharts trifft auf das SVG.js der jeweils anderen
-    // Karte. Ergebnis war "TypeError: t.put is not a function" mitten in fremdem
-    // Code, jedes Mal wenn diese Karte einen Chart bauen wollte. Wir bringen
-    // unsere eigene Version mit und fassen den globalen Namen nicht mehr an.
+    // Unsere eigene, gepinnte ApexCharts-Instanz -- nicht das, was andere Karten
+    // am window hinterlassen haben. Siehe utils/apexcharts-laden.ts.
     private async _loadScripts() {
-        if (this._scriptLoaded) return;
-        // Nur das Stylesheet kommt weiterhin von aussen; faellt es aus, sieht der
-        // Chart schlichter aus, gebaut wird er trotzdem.
-        stylesheetLaden('https://cdn.jsdelivr.net/npm/apexcharts@4.4.0/dist/apexcharts.css');
+        if (this._scriptLoaded && this._apex) return;
+        apexStylesheetLaden();
+        this._apex = await apexChartsLaden();
         this._scriptLoaded = true;
     }
 
@@ -1351,7 +1345,8 @@ export class FlowerGraph extends LitElement {
         };
 
         try {
-            this._chart = new ApexCharts(chartElement, options) as unknown as ApexChart;
+            if (!this._apex) throw new Error('ApexCharts steht nicht bereit');
+            this._chart = new this._apex(chartElement, options) as unknown as ApexChart;
             await this._chart.render();
             this.updateGraphData();  // Initial update
         } catch (error) {
